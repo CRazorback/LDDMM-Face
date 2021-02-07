@@ -63,10 +63,12 @@ def main():
     model = nn.DataParallel(model, device_ids=gpus).cuda()
 
     # loss
-    if config.MODEL['NAME'] in ['lddmm_hrnet', 'refine_hrnet', 'fcfan', 'rfcfan']:
-        criterion = LDDMMError().cuda()
+    if 'lddmm' in config.MODEL['NAME']:
+        criterion = LDDMMError(config).cuda()
+    elif 'coord' in config.MODEL['NAME']:
+        criterion = LDDMMError(config, curve=False).cuda()
     else:
-        criterion = torch.nn.MSELoss(size_average=True).cuda()
+        criterion = nn.MSELoss()
 
     optimizer = utils.get_optimizer(config, model)
     best_nme = 100
@@ -84,16 +86,16 @@ def main():
         else:
             print("=> no checkpoint found")
 
-    # if isinstance(config.TRAIN.LR_STEP, list):
-    #     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-    #         optimizer, config.TRAIN.LR_STEP,
-    #         config.TRAIN.LR_FACTOR, last_epoch-1
-    #     )
-    # else:
-    #     lr_scheduler = torch.optim.lr_scheduler.StepLR(
-    #         optimizer, config.TRAIN.LR_STEP,
-    #         config.TRAIN.LR_FACTOR, last_epoch-1
-    #     )
+    if isinstance(config.TRAIN.LR_STEP, list):
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+            optimizer, config.TRAIN.LR_STEP,
+            config.TRAIN.LR_FACTOR, last_epoch-1
+        )
+    else:
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer, config.TRAIN.LR_STEP,
+            config.TRAIN.LR_FACTOR, last_epoch-1
+        )
     dataset_type = get_dataset(config)
 
     train_loader = DataLoader(
@@ -114,8 +116,8 @@ def main():
     )
 
     for epoch in range(last_epoch, config.TRAIN.END_EPOCH):
-        # lr_scheduler.step()
-        utils.adjust_learning_rate(optimizer, last_epoch, config.TRAIN.END_EPOCH, config.TRAIN.LR)
+        lr_scheduler.step()
+        # utils.adjust_learning_rate(optimizer, last_epoch, config.TRAIN.END_EPOCH, config.TRAIN.LR)
 
         function.train(config, train_loader, model, criterion,
                        optimizer, epoch, writer_dict)

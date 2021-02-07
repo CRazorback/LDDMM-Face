@@ -14,7 +14,7 @@ DATASET:
 MODEL:
   NAME: 'lddmm_hrnet'
   TARGET_TYPE: 'Landmark'
-  NUM_JOINTS: 68
+  NUM_JOINTS: 72
   INIT_WEIGHTS: true
   PRETRAINED: 'hrnetv2_pretrained/HR18-300W.pth'
   FINETUNE_FE: false
@@ -81,5 +81,5 @@ TRAIN:
   NESTEROV: false
 TEST:
   BATCH_SIZE_PER_GPU: 16
-  NUM_JOINTS: 68
-  INFERENCE: false
+  NUM_JOINTS: 72
+  INFERENCE: true

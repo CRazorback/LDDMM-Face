@@ -17,10 +17,10 @@ from PIL import Image
 import numpy as np
 
 from lib.utils.transforms import fliplr_joints, crop, generate_target, transform_pixel
+from lib.utils.lddmm_params import get_index
 
 
 class Face300W(data.Dataset):
-
     def __init__(self, cfg, is_train=True, transform=None):
         # specify annotation file for dataset
         if is_train:
@@ -31,9 +31,10 @@ class Face300W(data.Dataset):
         self.is_train = is_train
         self.transform = transform
         self.data_root = cfg.DATASET.ROOT
+        self.dataset_name = cfg.DATASET.DATASET
         self.input_size = cfg.MODEL.IMAGE_SIZE
         self.output_size = cfg.MODEL.HEATMAP_SIZE
-        self.points = cfg.MODEL.NUM_JOINTS
+        self.points = cfg.MODEL.NUM_JOINTS if is_train else cfg.TEST.NUM_JOINTS
         self.sigma = cfg.MODEL.SIGMA
         self.scale_factor = cfg.DATASET.SCALE_FACTOR
         self.bounding_box_scale_factor = cfg.DATASET.BOUNDINGBOX_SCALE_FACTOR
@@ -47,23 +48,7 @@ class Face300W(data.Dataset):
         self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
-        self.curve2landmark = {
-            0: np.arange(0, 9),
-            1: np.arange(9, 17),
-            2: np.arange(17, 22),
-            3: np.arange(22, 27),
-            4: np.arange(27, 31),
-            5: np.arange(31, 36),
-            6: np.arange(36, 42),
-            7: np.arange(42, 48),
-            8: np.arange(48, 55),
-            9: np.arange(55, 60),
-            10: np.arange(60, 65),
-            11: np.arange(65, 68)}
-
-        self.index44 = [0, 2, 4, 6, 8, 10, 12, 14, 16, 17, 19, 21, 22, 24, 26,
-                        27, 30, 31, 33, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
-                        48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 65, 67]
+        self.index = get_index(cfg.DATASET.DATASET, self.points)
 
     def __len__(self):
         if self.is_train:
@@ -113,13 +98,9 @@ class Face300W(data.Dataset):
                 if self.label_type == 'Gaussian':                               
                     target[i] = generate_target(target[i], tpts[i]-1, self.sigma,
                                                 label_type=self.label_type)
-        # debug
-        # filename = './debug/{}_{}.jpg'
-        # index = random.randint(0, 100)
-        # imageio.imwrite(filename.format('origin', index), img.astype(np.uint8))
 
         img = img.astype(np.float32)
-        img = (img/255.0 - self.mean) / self.std
+        img = (img / 255.0 - self.mean) / self.std
         img = img.transpose([2, 0, 1])
         if self.label_type == 'Gaussian':
             target = torch.Tensor(target)
@@ -128,13 +109,13 @@ class Face300W(data.Dataset):
         origin_pts = torch.Tensor(pts)
 
         # weak-supervised
-        if self.points == 44:
-            tpts = tpts[self.index44]
-            pts = pts[self.index44]
+        if self.points != 68:
+            tpts = tpts[self.index]
+            pts = pts[self.index]
             if self.label_type == 'Gaussian':
-                target = target[self.index44]
+                target = target[self.index]
 
-        meta = {'index': idx, 'center': center, 'scale': scale,
+        meta = {'index': idx, 'center': center, 'scale': scale, 'dataset_name': self.dataset_name,
                 'pts': torch.Tensor(pts), 'tpts': tpts, 'origin_pts': origin_pts}
 
         if self.label_type == 'Gaussian':

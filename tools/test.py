@@ -53,6 +53,7 @@ def main():
     config.MODEL.INIT_WEIGHTS = False
     config.freeze()
     model = models.get_face_alignment_net(config).cuda()
+    # print(model)
 
     gpus = list(config.GPUS)
     # model = nn.DataParallel(model, device_ids=gpus).cuda()
@@ -69,23 +70,11 @@ def main():
                 name = k
             new_state_dict[name] = v
         model.load_state_dict(new_state_dict)
+    elif 'HR18' in args.model_file:
+        model.load_state_dict(state_dict)
     else:
         model.load_state_dict(state_dict.state_dict())
-    # new_state_dict = OrderedDict()
-    # for k, v in state_dict.items():
-    #     if 'module.' in k:
-    #         name = k[7:] # remove `module.`
-    #     else:
-    #         name = k
-    #     new_state_dict[name] = v
-    # model.load_state_dict(new_state_dict)
-    # if 'state_dict' in state_dict.keys():
-    #     state_dict = state_dict['state_dict']
-    #     model.load_state_dict(state_dict)
-    # else:
-    #     model.module.load_state_dict(state_dict)
     
-
     dataset_type = get_dataset(config)
 
     test_loader = DataLoader(

@@ -4,7 +4,7 @@ import torch.linalg
 import torch.nn as nn
 import torch.nn.functional as F
 
-from kornia import geometry
+from ..utils.lddmm_params import *
 
 
 class TransformParamsLayer(nn.Module):
@@ -95,11 +95,6 @@ class AffineTransformLayer(nn.Module):
         theta = torch.cat([A, t.view(-1, 2, 1)], dim=-1)
 
         return self.affine_transform(x, A, t)
-        # return geometry.warp_affine(x, theta, dsize=[112, 112])
-        # affine_grid = F.affine_grid(
-        #     theta, (self.batch_size, x.size(1), self.h, self.w))
-
-        # return F.grid_sample(x, affine_grid)
 
 
 class LandmarkTransformLayer(nn.Module):
@@ -203,71 +198,19 @@ class LandmarkHeatmapLayer(nn.Module):
 
 
 class LandmarkDeformLayer(nn.Module):
-    def __init__(self, n_T=3, n_landmark=68, broadcast_index=None):
+    def __init__(self, config, n_landmark, n_T=3):
         super(LandmarkDeformLayer, self).__init__()
 
         self.n_T = n_T
         self.tau = 1 / (self.n_T - 1)
         self.n_landmark = n_landmark 
-        self.broadcast_index = broadcast_index
-        self.curve2landmark68 = {
-            0: torch.arange(0, 9).long().cuda(),
-            1: torch.arange(9, 17).long().cuda(),
-            2: torch.arange(17, 22).long().cuda(),
-            3: torch.arange(22, 27).long().cuda(),
-            4: torch.arange(27, 31).long().cuda(),
-            5: torch.arange(31, 36).long().cuda(),
-            6: torch.arange(36, 42).long().cuda(),
-            7: torch.arange(42, 48).long().cuda(),
-            8: torch.arange(48, 55).long().cuda(),
-            9: torch.arange(55, 60).long().cuda(),
-            10: torch.arange(60, 65).long().cuda(),
-            11: torch.arange(65, 68).long().cuda()}
-        self.sigmaV2_68 = torch.cat([
-            torch.tensor([36.1889**2]*9),
-            torch.tensor([32.2242**2]*8),
-            torch.tensor([11.2157**2]*5),
-            torch.tensor([11.2157**2]*5),
-            torch.tensor([7.2351**2]*4),
-            torch.tensor([6.5614**2]*5),
-            torch.tensor([6.4939**2]*6),
-            torch.tensor([6.4939**2]*6),
-            torch.tensor([12.0834**2]*7),
-            torch.tensor([7.9841**2]*5),
-            torch.tensor([9.3308**2]*5),
-            torch.tensor([3.0845**2]*3)]).cuda()*2.25
-        self.curve2landmark44 = {
-            0: torch.arange(0, 5).long().cuda(),
-            1: torch.arange(5, 9).long().cuda(),
-            2: torch.arange(9, 12).long().cuda(),
-            3: torch.arange(12, 15).long().cuda(),
-            4: torch.arange(15, 17).long().cuda(),
-            5: torch.arange(17, 20).long().cuda(),
-            6: torch.arange(20, 26).long().cuda(),
-            7: torch.arange(26, 32).long().cuda(),
-            8: torch.arange(32, 36).long().cuda(),
-            9: torch.arange(36, 39).long().cuda(),
-            10: torch.arange(39, 42).long().cuda(),
-            11: torch.arange(42, 44).long().cuda()}
-        self.sigmaV2_44 = torch.cat([
-            torch.tensor([36.1889**2]*5),
-            torch.tensor([32.2242**2]*4),
-            torch.tensor([11.2157**2]*3),
-            torch.tensor([11.2157**2]*3),
-            torch.tensor([7.2351**2]*2),
-            torch.tensor([6.5614**2]*3),
-            torch.tensor([6.4939**2]*6),
-            torch.tensor([6.4939**2]*6),
-            torch.tensor([12.0834**2]*4),
-            torch.tensor([7.9841**2]*3),
-            torch.tensor([9.3308**2]*3),
-            torch.tensor([3.0845**2]*2)]).cuda()*2.25
-        if self.n_landmark == 68:
-            self.curve2landmark = self.curve2landmark68
-            self.sigmaV2 = self.sigmaV2_68
-        elif self.n_landmark == 44:
-            self.curve2landmark = self.curve2landmark44
-            self.sigmaV2 = self.sigmaV2_44
+        self.sigmaV2 = get_sigmaV2(config.DATASET.DATASET, n_landmark)
+        self.curve2landmark = get_curve2landmark(config.DATASET.DATASET, n_landmark)
+
+        if config.TEST.INFERENCE and (config.MODEL.NUM_JOINTS != n_landmark):
+            self.broadcast_index = get_index(config.DATASET.DATASET, config.MODEL.NUM_JOINTS)
+        else:
+            self.broadcast_index = None
 
         self.mask = torch.zeros((1, n_landmark, n_landmark, 2)).cuda()
         for k, v in self.curve2landmark.items():
@@ -325,89 +268,6 @@ class LandmarkDeformLayer(nn.Module):
         weight = torch.cat([weight.view(batch_size, self.n_landmark, 
                                         self.n_landmark, 1)]*2, dim=-1)
         # (b, n_landmark, 2)
-        dp2 = torch.sum(weight * masked_momentums, dim=-2)
-        output = deformed_shape.squeeze(1) + dp2 * self.tau
-
-        return output.view(batch_size, -1, 2)
-
-
-class LandmarkDeformLayer2(LandmarkDeformLayer):
-    def __init__(self, train_init_landmark, n_T=3, test_n_landmark=68, train_n_landmark=44):
-        super(LandmarkDeformLayer2, self).__init__(n_T, train_n_landmark)
-        self.train_init_landmark = train_init_landmark.view(1, -1, 2)
-        self.test_n_landmark = test_n_landmark
-        self.train_n_landmark = train_n_landmark
-
-        self.index44 = [0, 2, 4, 6, 8, 10, 12, 14, 16, 17, 19, 21, 22, 24, 26,
-                        27, 30, 31, 33, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
-                        48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 65, 67]
-
-        if test_n_landmark == 44:
-            self.sigmaV2 = self.sigmaV2_44
-            self.test_curve2landmark = self.curve2landmark44
-            if train_n_landmark == 44:
-                self.train_curve2landmark = self.curve2landmark44
-            else:
-                self.train_curve2landmark = self.curve2landmark68
-        elif test_n_landmark == 68:
-            self.sigmaV2 = self.sigmaV2_68
-            self.test_curve2landmark = self.curve2landmark68
-            if train_n_landmark == 44:
-                self.train_curve2landmark = self.curve2landmark44
-            else:
-                self.train_curve2landmark = self.curve2landmark68
-
-        self.mask = torch.zeros((1, test_n_landmark, train_n_landmark, 2)).cuda()
-        for k, v in self.train_curve2landmark.items():
-            for index, landmark in enumerate(list(self.test_curve2landmark[k])):
-                self.mask[0, landmark, v, :] = 1
-
-    def forward(self, momentum, init_landmark):
-        batch_size = momentum.size(0)
-        n_pt = init_landmark.size(1)
-        # guassian operator (b, test_n_landmark, 2)
-        dp1 = torch.zeros_like(init_landmark)
-        dp2 = torch.zeros_like(init_landmark)
-
-        momentum = momentum.view(batch_size, 1, -1, 2)
-        momentums = torch.cat([momentum]*self.test_n_landmark, dim=1)
-        train_init_landmark = torch.cat([self.train_init_landmark]*batch_size, dim=0).view(batch_size, 1, -1, 2)
-        train_init_landmarks = torch.cat([train_init_landmark]*self.test_n_landmark, dim=1)
-        train_init_landmarks_location = torch.cat([init_landmark.view(batch_size, 1, -1, 2)]*self.train_n_landmark, dim=1)
-
-        # T = 1
-        mask = torch.cat([self.mask]*batch_size, dim=0)
-        masked_init_landmarks = train_init_landmarks * mask
-        masked_init_landmarks_location = train_init_landmarks_location.permute(0, 2, 1, 3) * mask
-        masked_momentums = momentums * mask
-        sigmaV2 = torch.cat([self.sigmaV2.view(1, n_pt, 1)]*batch_size, dim=0)
-
-        # (b, test_n_landmark, train_landmark)
-        weight = torch.exp(-torch.sum(
-                    (masked_init_landmarks_location - masked_init_landmarks) ** 2, 
-                    dim=-1) / sigmaV2)
-        # (b, test_n_landmark, train_landmark, 2)
-        weight = torch.cat([weight.view(batch_size, self.test_n_landmark, 
-                                        self.train_n_landmark, 1)]*2, dim=-1)
-        # (b, test_n_landmark, 2)
-        dp1 = torch.sum(weight * masked_momentums, dim=-2)
-        deformed_shape = init_landmark.squeeze(1) + dp1 * self.tau
-
-        # T = 2
-        deformed_shape = deformed_shape.view(batch_size, 1, -1, 2)       
-        deformed_shapes_location = torch.cat([deformed_shape]*self.train_n_landmark, dim=1)
-        train_deformed_shape = deformed_shape[..., self.index44, :]
-        masked_deformed_shapes = torch.cat([train_deformed_shape]*self.test_n_landmark, dim=1) * mask
-        masked_deformed_shapes_location = deformed_shapes_location.permute(0, 2, 1, 3) * mask
-
-        # (b, test_n_landmark, train_n_landmark)
-        weight = torch.exp(-torch.sum(
-                    (masked_deformed_shapes_location - masked_deformed_shapes) ** 2, 
-                    dim=-1) / sigmaV2)
-        # (b, test_n_landmark, train_n_landmark, 2)
-        weight = torch.cat([weight.view(batch_size, self.test_n_landmark, 
-                                        self.train_n_landmark, 1)]*2, dim=-1)
-        # (b, test_n_landmark, train_landmark, 2) @ (b, train_landmark, 2) = (b, test_n_landmark, 2)
         dp2 = torch.sum(weight * masked_momentums, dim=-2)
         output = deformed_shape.squeeze(1) + dp2 * self.tau
 

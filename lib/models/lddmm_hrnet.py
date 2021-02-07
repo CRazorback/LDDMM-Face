@@ -14,6 +14,7 @@ import torch.nn.functional as F
 
 from .hrnet import HighResolutionNet, BasicBlock, Bottleneck
 from .lddmm import *
+from ..utils.lddmm_params import get_index
 
 
 BatchNorm2d = nn.BatchNorm2d
@@ -28,10 +29,11 @@ blocks_dict = {
 
 
 class LDDMMHighResolutionNet(HighResolutionNet):
-    def __init__(self, config, stage=0, **kwargs):
+    def __init__(self, config, deform=True, stage=0, **kwargs):
         super(LDDMMHighResolutionNet, self).__init__(config)
 
         self.is_train = not config.TEST.INFERENCE
+        self.lddmm = deform
         self.points = config.MODEL.NUM_JOINTS if self.is_train else config.TEST.NUM_JOINTS
         self.stage = stage
         self.scale = config.DATASET.BOUNDINGBOX_SCALE_FACTOR
@@ -84,33 +86,29 @@ class LDDMMHighResolutionNet(HighResolutionNet):
         self.incre_modules, self.downsamp_modules, \
             self.final_layer = self._make_head(pre_stage_channels)
 
-        self.regressor = nn.Linear(270, config.MODEL.NUM_JOINTS*2)
+        self.regressor = nn.Linear(2048, config.MODEL.NUM_JOINTS*2)
         
-        self.init_landmarks = np.load('data/init_landmark.npy')
-        self.index44 = [0, 2, 4, 6, 8, 10, 12, 14, 16, 17, 19, 21, 22, 24, 26,
-                        27, 30, 31, 33, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
-                        48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 65, 67]
+        if config.DATASET.DATASET == '300W':
+            self.init_landmarks = np.load('data/init_landmark.npy')
+            self.init_landmarks -= 56
+            self.init_landmarks *= 1.25
+            self.init_landmarks += 56
+        elif config.DATASET.DATASET == 'WFLW':
+            self.init_landmarks = np.load('data/wflw/init_landmark.npy')
+        
         logger.info('=> loading initial landmarks...')
         self.init_landmarks = torch.Tensor(self.init_landmarks).cuda()
         self.init_landmarks = self.init_landmarks * config.MODEL.HEATMAP_SIZE[0] / 112
-        
+         
         if self.is_train:
-            self.deform = LandmarkDeformLayer(n_landmark=config.MODEL.NUM_JOINTS)
+            self.deform = LandmarkDeformLayer(config, n_landmark=config.MODEL.NUM_JOINTS)
         else:
-            # self.deform = LandmarkDeformLayer2(train_init_landmark=self.init_landmarks[self.index44],
-            #         train_n_landmark=config.MODEL.NUM_JOINTS, test_n_landmark=config.TEST.NUM_JOINTS)
-            if config.TEST.NUM_JOINTS == config.MODEL.NUM_JOINTS:
-                self.deform = LandmarkDeformLayer(n_landmark=config.TEST.NUM_JOINTS)
-            else:
-                self.deform = LandmarkDeformLayer(n_landmark=config.TEST.NUM_JOINTS, broadcast_index=self.index44)
+            self.deform = LandmarkDeformLayer(config, n_landmark=config.TEST.NUM_JOINTS)
                     
-        if self.points == 44:
-            self.init_landmarks = self.init_landmarks[self.index44]
-        # 1.25 scale
-        # if self.scale == 1.25:
-        #     self.init_landmarks -= (config.MODEL.HEATMAP_SIZE[0] // 2)
-        #     self.init_landmarks *= 1.25
-        #     self.init_landmarks += (config.MODEL.HEATMAP_SIZE[0] // 2)
+        if (config.DATASET.DATASET == '300W' and self.points != 68) or \
+           (config.DATASET.DATASET == 'WFLW' and self.points != 98):
+            self.index = get_index(config.DATASET.DATASET, self.points)
+            self.init_landmarks = self.init_landmarks[self.index]
 
         self.landmark2img = LandmarkImageLayer(patch_size=6)
 
@@ -222,9 +220,10 @@ class LDDMMHighResolutionNet(HighResolutionNet):
                                 [2:]).view(y.size(0), -1)
 
         alpha = self.regressor(y)
-        deformed_pts = self.deform(alpha, init_pts)
-
-        return deformed_pts
+        if self.lddmm:
+            return self.deform(alpha, init_pts)
+        else:
+            return alpha.view(alpha.size(0), -1, 2)
 
     def forward(self, x, init_pts=None):
         output = self.forward_function(x, init_pts)

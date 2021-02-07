@@ -14,7 +14,7 @@ import logging
 import torch
 import numpy as np
 
-from .evaluation import compute_curve_dist, compute_perpendicular_dist, decode_preds, compute_nme
+from .evaluation import compute_curve_dist, compute_perpendicular_dist, decode_preds, decode_duplicate, compute_nme
 from ..utils.transforms import transform_preds
 
 logger = logging.getLogger(__name__)
@@ -142,6 +142,7 @@ def validate(config, val_loader, model, criterion, epoch, writer_dict):
             loss = criterion(output, target)
 
             preds = decode_preds(score_map, meta['center'], meta['scale'], config.MODEL.HEATMAP_SIZE)
+            preds = decode_duplicate(preds, config)
                 
             # NME
             nme_temp = compute_nme(preds, meta)
@@ -210,6 +211,7 @@ def inference(config, data_loader, model):
             score_map = output.data.cpu()
 
             preds = decode_preds(score_map, meta['center'], meta['scale'], config.MODEL.HEATMAP_SIZE)
+            preds = decode_duplicate(preds, config)
 
             # NME
             nme_temp = compute_nme(preds, meta)

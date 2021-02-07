@@ -16,6 +16,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ..utils.lddmm_params import get_index
+
 
 BatchNorm2d = nn.BatchNorm2d
 BN_MOMENTUM = 0.01
@@ -318,6 +320,15 @@ class HighResolutionNet(nn.Module):
                 padding=1 if extra.FINAL_CONV_KERNEL == 3 else 0)
         )
 
+        # flexible
+        self.is_train = not config.TEST.INFERENCE
+        self.points = config.MODEL.NUM_JOINTS if self.is_train else config.TEST.NUM_JOINTS
+        self.index = None
+        if (config.DATASET.DATASET == '300W' and self.points != 68) or \
+           (config.DATASET.DATASET == 'WFLW' and self.points != 98):
+            self.index = get_index(config.DATASET.DATASET, self.points)
+            self.index = torch.tensor(self.index).long().cuda()
+
     def _make_transition_layer(
             self, num_channels_pre_layer, num_channels_cur_layer):
         num_branches_cur = len(num_channels_cur_layer)
@@ -441,6 +452,9 @@ class HighResolutionNet(nn.Module):
         x3 = F.interpolate(x[3], size=(height, width), mode='bilinear', align_corners=False)
         x = torch.cat([x[0], x1, x2, x3], 1)
         x = self.head(x)
+
+        if self.index is not None:
+            x = x[:, self.index, ...]
 
         return x
 

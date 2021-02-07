@@ -132,3 +132,4 @@ data/
 log/
 output/
 *.pth
+*.jpg

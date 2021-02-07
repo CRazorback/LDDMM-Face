@@ -14,6 +14,7 @@ from PIL import Image
 import numpy as np
 
 from ..utils.transforms import fliplr_joints, crop, generate_target, transform_pixel
+from lib.utils.lddmm_params import get_index
 
 
 class WFLW(data.Dataset):
@@ -26,17 +27,21 @@ class WFLW(data.Dataset):
 
         self.is_train = is_train
         self.transform = transform
+        self.dataset_name = cfg.DATASET.DATASET
         self.data_root = cfg.DATASET.ROOT
         self.input_size = cfg.MODEL.IMAGE_SIZE
         self.output_size = cfg.MODEL.HEATMAP_SIZE
+        self.points = cfg.MODEL.NUM_JOINTS if is_train else cfg.TEST.NUM_JOINTS
         self.sigma = cfg.MODEL.SIGMA
         self.scale_factor = cfg.DATASET.SCALE_FACTOR
+        self.bounding_box_scale_factor = cfg.DATASET.BOUNDINGBOX_SCALE_FACTOR
         self.rot_factor = cfg.DATASET.ROT_FACTOR
         self.label_type = cfg.MODEL.TARGET_TYPE
         self.flip = cfg.DATASET.FLIP
 
         # load annotations
         self.landmarks_frame = pd.read_csv(self.csv_file)
+        self.index = get_index(cfg.DATASET.DATASET, self.points)
 
         self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
@@ -73,27 +78,42 @@ class WFLW(data.Dataset):
                 center[0] = img.shape[1] - center[0]
 
         img = crop(img, center, scale, self.input_size, rot=r)
-
-        target = np.zeros((nparts, self.output_size[0], self.output_size[1]))
+        if self.label_type == 'Gaussian':
+            target = np.zeros((nparts, self.output_size[0], self.output_size[1]))
         tpts = pts.copy()
 
         for i in range(nparts):
             if tpts[i, 1] > 0:
                 tpts[i, 0:2] = transform_pixel(tpts[i, 0:2]+1, center,
                                                scale, self.output_size, rot=r)
-                target[i] = generate_target(target[i], tpts[i]-1, self.sigma,
-                                            label_type=self.label_type)
+                if self.label_type == 'Gaussian':                               
+                    target[i] = generate_target(target[i], tpts[i]-1, self.sigma,
+                                                label_type=self.label_type)
+
         img = img.astype(np.float32)
-        img = (img/255.0 - self.mean) / self.std
+        img = (img / 255.0 - self.mean) / self.std
         img = img.transpose([2, 0, 1])
-        target = torch.Tensor(target)
+        if self.label_type == 'Gaussian':
+            target = torch.Tensor(target)
         tpts = torch.Tensor(tpts)
         center = torch.Tensor(center)
+        origin_pts = torch.Tensor(pts)
 
-        meta = {'index': idx, 'center': center, 'scale': scale,
-                'pts': torch.Tensor(pts), 'tpts': tpts}
+        # weak-supervised
+        if self.points != 98:
+            tpts = tpts[self.index]
+            pts = pts[self.index]
+            origin_pts = origin_pts[self.index]
+            if self.label_type == 'Gaussian':
+                target = target[self.index]
 
-        return img, target, meta
+        meta = {'index': idx, 'center': center, 'scale': scale, 'dataset_name': self.dataset_name,
+                'pts': torch.Tensor(pts), 'tpts': tpts, 'origin_pts': origin_pts}
+
+        if self.label_type == 'Gaussian':
+            return img, target, meta
+        else:
+            return img, tpts, meta
 
 
 if __name__ == '__main__':
