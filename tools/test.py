@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import lib.models as models
 from lib.config import config, update_config
 from lib.utils import utils
-from lib.datasets import get_dataset
+from lib.datasets import get_dataset, get_testset
 from lib.core import function
 from collections import OrderedDict
 
@@ -71,11 +71,18 @@ def main():
             new_state_dict[name] = v
         model.load_state_dict(new_state_dict)
     elif 'HR18' in args.model_file:
-        model.load_state_dict(state_dict)
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            if 'module.' in k:
+                name = k[7:] # remove `module.`
+            else:
+                name = k
+            new_state_dict[name] = v
+        model.load_state_dict(new_state_dict)
     else:
         model.load_state_dict(state_dict.state_dict())
     
-    dataset_type = get_dataset(config)
+    dataset_type = get_testset(config)
 
     test_loader = DataLoader(
         dataset=dataset_type(config,

@@ -4,20 +4,24 @@
 # Created by Tianheng Cheng(tianhengcheng@gmail.com), Yang Zhao
 # ------------------------------------------------------------------------------
 
+from lib.models.lddmm import LandmarkImageLayer
 import os
 import random
+import itertools
+import imageio
 
 import torch
+import torch.nn as nn
 import torch.utils.data as data
 import pandas as pd
 from PIL import Image
 import numpy as np
 
-from ..utils.transforms import fliplr_joints, crop, generate_target, transform_pixel
+from lib.utils.transforms import fliplr_joints, crop, generate_target, transform_pixel
 from lib.utils.lddmm_params import get_index
 
 
-class WFLW(data.Dataset):
+class Helen(data.Dataset):
     def __init__(self, cfg, is_train=True, transform=None):
         # specify annotation file for dataset
         if is_train:
@@ -27,8 +31,8 @@ class WFLW(data.Dataset):
 
         self.is_train = is_train
         self.transform = transform
-        self.dataset_name = 'WFLW'
         self.data_root = cfg.DATASET.ROOT
+        self.dataset_name = 'Helen'
         self.input_size = cfg.MODEL.IMAGE_SIZE
         self.output_size = cfg.MODEL.HEATMAP_SIZE
         self.points = cfg.MODEL.NUM_JOINTS if is_train else cfg.TEST.NUM_JOINTS
@@ -41,28 +45,36 @@ class WFLW(data.Dataset):
 
         # load annotations
         self.landmarks_frame = pd.read_csv(self.csv_file)
-        self.index = get_index('WFLW', self.points)
 
         self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
+        self.index = get_index('Helen', self.points)
+        
+        # self.landmark2image = LandmarkImageLayer(6)
+
     def __len__(self):
-        return len(self.landmarks_frame)
+        if self.is_train:
+            return 2000
+        else:
+            return 330
 
     def __getitem__(self, idx):
-
+        # idx = idx % len(self.landmarks_frame)
+        idx += 1
         image_path = os.path.join(self.data_root,
-                                  self.landmarks_frame.iloc[idx, 0])
-        scale = self.landmarks_frame.iloc[idx, 1]
+                                  self.landmarks_frame.iloc[0, idx])
+        scale = float(self.landmarks_frame.iloc[1, idx])
 
-        center_w = self.landmarks_frame.iloc[idx, 2]
-        center_h = self.landmarks_frame.iloc[idx, 3]
+        center_w = float(self.landmarks_frame.iloc[2, idx])
+        center_h = float(self.landmarks_frame.iloc[3, idx])
         center = torch.Tensor([center_w, center_h])
 
-        pts = self.landmarks_frame.iloc[idx, 4:].values
+        pts = self.landmarks_frame.iloc[4:, idx].values
         pts = pts.astype('float').reshape(-1, 2)
 
-        scale *= 1.25
+        # DAN scale or HRNet scale
+        scale *= self.bounding_box_scale_factor
         nparts = pts.shape[0]
         img = np.array(Image.open(image_path).convert('RGB'), dtype=np.float32)
 
@@ -74,7 +86,7 @@ class WFLW(data.Dataset):
                 if random.random() <= 0.6 else 0
             if random.random() <= 0.5 and self.flip:
                 img = np.fliplr(img)
-                pts = fliplr_joints(pts, width=img.shape[1], dataset='WFLW')
+                pts = fliplr_joints(pts, width=img.shape[1], dataset='Helen')
                 center[0] = img.shape[1] - center[0]
 
         img = crop(img, center, scale, self.input_size, rot=r)
@@ -99,11 +111,18 @@ class WFLW(data.Dataset):
         center = torch.Tensor(center)
         origin_pts = torch.Tensor(pts)
 
+        # debug
+        # img /= 255
+        # landmark_img = self.landmark2image(torch.tensor(img).unsqueeze(0), tpts.unsqueeze(0))
+        # landmark_img = landmark_img[0, 0].detach().cpu().numpy()
+        # overlap = np.where(landmark_img == 0, img[0], landmark_img)
+        # filename = './debug/{}_{}.jpg'
+        # imageio.imwrite(filename.format('overlap', idx), (overlap*255).astype(np.uint8))
+
         # weak-supervised
-        if self.points < 98:
+        if self.points < 194:
             tpts = tpts[self.index]
             pts = pts[self.index]
-            origin_pts = origin_pts[self.index]
             if self.label_type == 'Gaussian':
                 target = target[self.index]
 
@@ -114,7 +133,4 @@ class WFLW(data.Dataset):
             return img, target, meta
         else:
             return img, tpts, meta
-
-
-if __name__ == '__main__':
-    pass
+    

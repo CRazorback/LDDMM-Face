@@ -208,7 +208,7 @@ class LandmarkDeformLayer(nn.Module):
         self.curve2landmark = get_curve2landmark(config.DATASET.DATASET, n_landmark)
 
         if config.TEST.INFERENCE and (config.MODEL.NUM_JOINTS != n_landmark):
-            self.broadcast_index = get_index(config.DATASET.DATASET, config.MODEL.NUM_JOINTS)
+            self.broadcast_index = get_broadcast_index(config.DATASET.DATASET, config.MODEL.NUM_JOINTS, n_landmark)
         else:
             self.broadcast_index = None
 
@@ -272,3 +272,61 @@ class LandmarkDeformLayer(nn.Module):
         output = deformed_shape.squeeze(1) + dp2 * self.tau
 
         return output.view(batch_size, -1, 2)
+
+
+class SingleCurveDeformLayer(nn.Module):
+    def __init__(self, n_T=3):
+        super(SingleCurveDeformLayer, self).__init__()
+
+        self.n_T = n_T
+        self.tau = 1 / (self.n_T - 1)
+
+    def forward(self, momentum, source_init, target_init, sigmaV2):
+        batch_size = momentum.size(0)
+        n_momentum = momentum.size(1)
+        n_pt = source_init.size(1) + target_init.size(1)
+        init_landmark = torch.cat([source_init, target_init], dim=1)
+        broadcast_momentum = torch.zeros_like(init_landmark)
+        broadcast_momentum[:, 0:n_momentum] = momentum.view(batch_size, -1, 2)
+        momentum = broadcast_momentum
+        # guassian operator (b, n_landmark, 2)
+        dp1 = torch.zeros_like(momentum)
+        dp2 = torch.zeros_like(momentum)
+
+        momentum = momentum.view(batch_size, 1, -1, 2)
+        momentums = torch.cat([momentum]*n_pt, dim=1)
+        init_landmark = init_landmark.view(batch_size, 1, -1, 2)
+        init_landmarks = torch.cat([init_landmark]*n_pt, dim=1)
+
+        # T = 1
+        masked_init_landmarks = init_landmarks
+        masked_init_landmarks_location = masked_init_landmarks.permute(0, 2, 1, 3)
+        masked_momentums = momentums
+
+        # (b, n_landmark, n_landmark)
+        weight = torch.exp(-torch.sum(
+                    (masked_init_landmarks_location - masked_init_landmarks) ** 2, 
+                    dim=-1) / sigmaV2)
+        # (b, n_landmark, n_landmark, 2)
+        weight = torch.cat([weight.view(batch_size, n_pt, n_pt, 1)]*2, dim=-1)
+        # (b, n_landmark, 2)
+        dp1 = torch.sum(weight * masked_momentums, dim=-2)
+        deformed_shape = init_landmark.squeeze(1) + dp1 * self.tau
+
+        # T = 2
+        deformed_shape = deformed_shape.view(batch_size, 1, -1, 2)
+        deformed_shapes = torch.cat([deformed_shape]*n_pt, dim=1)
+        masked_deformed_shapes = deformed_shapes
+        masked_deformed_shapes_location = masked_deformed_shapes.permute(0, 2, 1, 3)
+
+        # (b, n_landmark, n_landmark)
+        weight = torch.exp(-torch.sum(
+                    (masked_deformed_shapes_location - masked_deformed_shapes) ** 2, 
+                    dim=-1) / sigmaV2)
+        # (b, n_landmark, n_landmark, 2)
+        weight = torch.cat([weight.view(batch_size, n_pt, n_pt, 1)]*2, dim=-1)
+        # (b, n_landmark, 2)
+        dp2 = torch.sum(weight * masked_momentums, dim=-2)
+        output = deformed_shape.squeeze(1) + dp2 * self.tau
+
+        return output.view(batch_size, -1, 2)[:, n_momentum:]

@@ -2,6 +2,7 @@ import argparse
 from lib.config import config, update_config
 import sys
 import numpy as np
+import scipy.io
 from lib.datasets import WFLW, Face300W
 
 # parser = argparse.ArgumentParser(description='Train Face Alignment')
@@ -20,23 +21,23 @@ from lib.datasets import WFLW, Face300W
 # print(mean_shape)
 
 # np.save('./data/300w/init_landmark.npy', mean_shape.numpy())
-curve2landmark = {
-    0: np.arange(0, 9),
-    1: np.arange(9, 17),
-    2: np.arange(17, 22),
-    3: np.arange(22, 27),
-    4: np.arange(27, 31),
-    5: np.arange(31, 36),
-    6: np.arange(36, 42),
-    7: np.arange(42, 48),
-    8: np.arange(48, 55),
-    9: np.arange(55, 62),
-    10: np.arange(62, 67),
-    11: np.arange(67, 72)}
-init_landmarks = np.load('./data/init_landmark.npy')
-index = list(np.arange(0, 48)) + list(np.arange(48, 55)) + list(np.arange(54, 60)) +\
-                    [48] + list(np.arange(60, 65)) + list(np.arange(64, 68)) + [60]
-init_landmarks = init_landmarks[index]
+# curve2landmark = {
+#     0: np.arange(0, 9),
+#     1: np.arange(9, 17),
+#     2: np.arange(17, 22),
+#     3: np.arange(22, 27),
+#     4: np.arange(27, 31),
+#     5: np.arange(31, 36),
+#     6: np.arange(36, 42),
+#     7: np.arange(42, 48),
+#     8: np.arange(48, 55),
+#     9: np.arange(55, 62),
+#     10: np.arange(62, 67),
+#     11: np.arange(67, 72)}
+# init_landmarks = np.load('./data/init_landmark.npy')
+# index = list(np.arange(0, 48)) + list(np.arange(48, 55)) + list(np.arange(54, 60)) +\
+#                     [48] + list(np.arange(60, 65)) + list(np.arange(64, 68)) + [60]
+# init_landmarks = init_landmarks[index]
 # curve2landmark = {
 #     0: np.arange(0, 17),
 #     1: np.arange(17, 33),
@@ -52,9 +53,23 @@ init_landmarks = init_landmarks[index]
 #     11: np.arange(93, 96)
 # }
 # init_landmarks = np.load('data/wflw/init_landmark.npy')
+curve2landmark = {
+    0: np.arange(0, 21),
+    1: np.arange(21, 41),
+    2: np.arange(41, 58),
+    3: np.arange(58, 72),
+    4: np.arange(72, 86),
+    5: np.arange(86, 100),
+    6: np.arange(100, 114),
+    7: np.arange(114, 134),
+    8: np.arange(134, 154),
+    9: np.arange(154, 174),
+    10: np.arange(174, 194)}
+init_landmarks = scipy.io.loadmat('data/300w/images/helen/Helen_meanShape_256_1_5x.mat')['Helen_meanShape_256_1_5x']
+init_landmarks *= (112 / 256)
 
-sigmaV = np.zeros([12])
-sigmaW = np.zeros([12])
+sigmaV = np.zeros([11])
+sigmaW = np.zeros([11])
 for curve_idx, landmark_idxs in curve2landmark.items():
     landmarks = init_landmarks[landmark_idxs]
     x = landmarks[:, 0]

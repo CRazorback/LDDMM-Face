@@ -6,7 +6,7 @@ import os
 import logging
 
 import numpy as np
-from numpy.lib.stride_tricks import broadcast_arrays
+import scipy.io
 
 import torch
 import torch.nn as nn
@@ -30,8 +30,11 @@ blocks_dict = {
 
 class LDDMMHighResolutionNet(HighResolutionNet):
     def __init__(self, config, deform=True, stage=0, **kwargs):
-        super(LDDMMHighResolutionNet, self).__init__(config)
+        # super(LDDMMHighResolutionNet, self).__init__(config)
 
+        self.config = config
+        # self.return_momentum = False
+        self.return_momentum = (config.TEST.DATASET != config.DATASET.DATASET)
         self.is_train = not config.TEST.INFERENCE
         self.lddmm = deform
         self.points = config.MODEL.NUM_JOINTS if self.is_train else config.TEST.NUM_JOINTS
@@ -90,11 +93,16 @@ class LDDMMHighResolutionNet(HighResolutionNet):
         
         if config.DATASET.DATASET == '300W':
             self.init_landmarks = np.load('data/init_landmark.npy')
+            if self.points == 131:
+                self.init_landmarks = scipy.io.loadmat('data/300w/upsample_131.mat')['upsample_131']
             self.init_landmarks -= 56
             self.init_landmarks *= 1.25
             self.init_landmarks += 56
         elif config.DATASET.DATASET == 'WFLW':
             self.init_landmarks = np.load('data/wflw/init_landmark.npy')
+        elif config.DATASET.DATASET == 'Helen':
+            self.init_landmarks = scipy.io.loadmat('data/300w/images/helen/Helen_meanShape_256_1_5x.mat')['Helen_meanShape_256_1_5x']
+            self.init_landmarks *= (112 / 256)
         
         logger.info('=> loading initial landmarks...')
         self.init_landmarks = torch.Tensor(self.init_landmarks).cuda()
@@ -102,11 +110,15 @@ class LDDMMHighResolutionNet(HighResolutionNet):
          
         if self.is_train:
             self.deform = LandmarkDeformLayer(config, n_landmark=config.MODEL.NUM_JOINTS)
+        elif self.return_momentum:
+            self.deform = None
         else:
             self.deform = LandmarkDeformLayer(config, n_landmark=config.TEST.NUM_JOINTS)
                     
-        if (config.DATASET.DATASET == '300W' and self.points != 68) or \
-           (config.DATASET.DATASET == 'WFLW' and self.points != 98):
+        if ((config.DATASET.DATASET == '300W' and self.points < 131) or \
+           (config.DATASET.DATASET == 'WFLW' and self.points < 98) or \
+           (config.DATASET.DATASET == 'Helen' and self.points < 194)) and \
+            not self.return_momentum:
             self.index = get_index(config.DATASET.DATASET, self.points)
             self.init_landmarks = self.init_landmarks[self.index]
 
@@ -220,31 +232,74 @@ class LDDMMHighResolutionNet(HighResolutionNet):
                                 [2:]).view(y.size(0), -1)
 
         alpha = self.regressor(y)
-        if self.lddmm:
+        if self.lddmm and not self.return_momentum:
             return self.deform(alpha, init_pts)
+        if self.return_momentum:
+            return self.cross_deform(self.config, alpha.view(alpha.size(0), -1, 2))
         else:
             return alpha.view(alpha.size(0), -1, 2)
 
     def forward(self, x, init_pts=None):
         output = self.forward_function(x, init_pts)
 
-        # # debug
-        # import random
-        # import imageio
-        # mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        # std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        # filename = './debug/{}_{}.jpg'
-        # index = random.randint(0, 100)
-        # origin_img = x[1].detach().cpu().permute(1, 2, 0).numpy()
-        # origin_img = origin_img * std + mean
-        # # landmark image
-        # landmark_imgs = self.landmark2img(x, output * 256 / 112)
-        # # landmark40 = self.landmark2img(x[0].unsqueeze(0), self.deform.train_init_landmark.unsqueeze(0) * 256 / 112)
-        # landmark_img = landmark_imgs[1, 0].detach().cpu().numpy()
-        # # landmark40 = landmark40[0, 0].detach().cpu().numpy()
-        # overlap = np.where(landmark_img == 0, origin_img[..., 0], landmark_img)
-        # imageio.imwrite(filename.format('origin', index), (origin_img*255).astype(np.uint8))
-        # imageio.imwrite(filename.format('overlap', index), (overlap*255).astype(np.uint8))
-        # # imageio.imwrite(filename.format('init_landmark', index), (landmark40*255).astype(np.uint8))
+        # debug
+        import random
+        import imageio
+        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        filename = './debug/{}_{}.jpg'
+        index = random.randint(0, 100)
+        origin_img = x[1].detach().cpu().permute(1, 2, 0).numpy()
+        origin_img = origin_img * std + mean
+        # landmark image
+        landmark_imgs = self.landmark2img(x, output)
+        # landmark40 = self.landmark2img(x[0].unsqueeze(0), self.deform.train_init_landmark.unsqueeze(0) * 256 / 112)
+        landmark_img = landmark_imgs[1, 0].detach().cpu().numpy()
+        # landmark40 = landmark40[0, 0].detach().cpu().numpy()
+        overlap = np.where(landmark_img == 0, origin_img[..., 0], landmark_img)
+        imageio.imwrite(filename.format('origin', index), (origin_img*255).astype(np.uint8))
+        imageio.imwrite(filename.format('overlap', index), (overlap*255).astype(np.uint8))
+        # imageio.imwrite(filename.format('init_landmark', index), (landmark40*255).astype(np.uint8))
 
         return output
+
+    def cross_deform(self, config, momentum):
+        batch_size = momentum.size(0)
+        sigmaV2 = get_sigmaV2(config.DATASET.DATASET, config.MODEL.NUM_JOINTS)
+        curve_deform = SingleCurveDeformLayer()
+
+        if config.DATASET.DATASET == '300W' and config.TEST.DATASET == 'Helen':
+            source_init_landmarks = np.load('data/init_landmark.npy')
+            source_init_landmarks -= 56
+            source_init_landmarks *= 1.25
+            source_init_landmarks += 56
+            target_init_landmarks = scipy.io.loadmat('data/300w/Helen_to_300w_baseShape.mat')['shape']
+            target_init_landmarks -= 56
+            target_init_landmarks *= 1.25
+            target_init_landmarks += 56
+            s2t = [0, 1, -1, -1, -1, -1, 8, 7, 3, 4, 5, 6]
+        elif config.DATASET.DATASET == 'Helen' and config.TEST.DATASET == '300W':
+            source_init_landmarks = scipy.io.loadmat('data/300w/images/helen/Helen_meanShape_256_1_5x.mat')['Helen_meanShape_256_1_5x']
+            source_init_landmarks *= (112 / 256)
+            target_init_landmarks = scipy.io.loadmat('data/300w/images/helen/300w_to_Helen_baseShape.mat')['shape']
+            target_init_landmarks *= (112 / 256)
+            s2t = [0, 1, -1, 8, 9, 10, 11, 7, 6, -1, -1]
+            # s2t = [0, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+        
+        source_curve2landmark = get_curve2landmark(config.DATASET.DATASET, config.MODEL.NUM_JOINTS)
+        target_curve2landmark = get_curve2landmark(config.TEST.DATASET, config.TEST.NUM_JOINTS)
+
+        source_init_landmarks = torch.Tensor(source_init_landmarks).cuda().view(1, -1, 2)
+        source_init_landmarks = torch.cat([source_init_landmarks]*batch_size, dim=0)
+        source_init_landmarks = source_init_landmarks * config.MODEL.HEATMAP_SIZE[0] / 112
+        target_init_landmarks = torch.Tensor(target_init_landmarks).cuda().view(1, -1, 2)
+        target_init_landmarks = torch.cat([target_init_landmarks]*batch_size, dim=0)
+        target_init_landmarks = target_init_landmarks * config.MODEL.HEATMAP_SIZE[0] / 112
+        results = torch.ones([batch_size, config.TEST.NUM_JOINTS, 2]).cuda()
+
+        for k, v in source_curve2landmark.items():
+            if s2t[k] != -1:
+                target_curve = target_curve2landmark[s2t[k]]
+                results[:, target_curve] = curve_deform(momentum[:, v], source_init_landmarks[:, v], target_init_landmarks[:, target_curve], sigmaV2[v][0])
+
+        return results

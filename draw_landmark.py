@@ -174,15 +174,17 @@ import matplotlib.pyplot as plt
 #         [52.3823, 73.3020]])
 
 coord_ref = np.load('data/init_landmark.npy')
-coord_ref -= 56
-coord_ref *= 1.25
-coord_ref += 56
-coord = scipy.io.loadmat('data/300w/upsample_131.mat')['upsample_131']
-coord *= (112 / 256)
-coord -= 56
-coord *= 1.25
-coord += 56
-x = coord[:, 0]
-y = coord[:, 1]
+# coord_ref -= 56
+# coord_ref *= 1.25
+# coord_ref += 56
+# coord = scipy.io.loadmat('data/300w/upsample_131.mat')['upsample_131']
+# coord = scipy.io.loadmat('data/300w/images/helen/Helen_meanShape_256_1_5x.mat')['Helen_meanShape_256_1_5x']
+coord = scipy.io.loadmat('data/300w/Helen_to_300w_baseShape.mat')['shape']
+# coord *= (112 / 256)
+# coord -= 56
+# coord *= 1.25
+# coord += 56
+x = coord_ref[:, 0]
+y = coord_ref[:, 1]
 plt.scatter(x, y)
-plt.savefig('300w_131.jpg')
+plt.savefig('300w_1x_ref.jpg')

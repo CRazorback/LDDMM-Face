@@ -10,7 +10,8 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["--cfg", "experiments/wflw/face_alignment_wflw_hrnet_w18.yaml", "--model-file", "hrnetv2_pretrained/HR18-WFLW.pth"]
+            "args": ["--cfg", "experiments/helen/face_alignment_helen_lddmm_hrnet_w18_pt194.yaml",
+                     "--model-file", "output/Helen/face_alignment_helen_lddmm_hrnet_w18_pt194/model_best.pth"]
         }
     ]
 }

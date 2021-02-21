@@ -324,8 +324,9 @@ class HighResolutionNet(nn.Module):
         self.is_train = not config.TEST.INFERENCE
         self.points = config.MODEL.NUM_JOINTS if self.is_train else config.TEST.NUM_JOINTS
         self.index = None
-        if (config.DATASET.DATASET == '300W' and self.points != 68) or \
-           (config.DATASET.DATASET == 'WFLW' and self.points != 98):
+        if (config.DATASET.DATASET == '300W' and self.points < 68) or \
+           (config.DATASET.DATASET == 'WFLW' and self.points < 98) or \
+           (config.DATASET.DATASET == 'Helen' and self.points < 194):
             self.index = get_index(config.DATASET.DATASET, self.points)
             self.index = torch.tensor(self.index).long().cuda()
 
@@ -470,7 +471,7 @@ class HighResolutionNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
         if os.path.isfile(pretrained):
             pretrained_dict = torch.load(pretrained)
-            if 'lddmm' in pretrained or 'best' in pretrained:
+            if 'lddmm' in pretrained or 'best' in pretrained or 'Helen' in pretrained:
                 pretrained_dict = pretrained_dict.state_dict()
             if 'checkpoint' in pretrained:
                 pretrained_dict = pretrained_dict['state_dict'].state_dict()

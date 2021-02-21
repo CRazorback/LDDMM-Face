@@ -31,7 +31,7 @@ class Face300W(data.Dataset):
         self.is_train = is_train
         self.transform = transform
         self.data_root = cfg.DATASET.ROOT
-        self.dataset_name = cfg.DATASET.DATASET
+        self.dataset_name = '300W'
         self.input_size = cfg.MODEL.IMAGE_SIZE
         self.output_size = cfg.MODEL.HEATMAP_SIZE
         self.points = cfg.MODEL.NUM_JOINTS if is_train else cfg.TEST.NUM_JOINTS
@@ -48,7 +48,7 @@ class Face300W(data.Dataset):
         self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
-        self.index = get_index(cfg.DATASET.DATASET, self.points)
+        self.index = get_index('300W', self.points)
 
     def __len__(self):
         if self.is_train:
@@ -109,7 +109,7 @@ class Face300W(data.Dataset):
         origin_pts = torch.Tensor(pts)
 
         # weak-supervised
-        if self.points != 68:
+        if self.points < 68:
             tpts = tpts[self.index]
             pts = pts[self.index]
             if self.label_type == 'Gaussian':

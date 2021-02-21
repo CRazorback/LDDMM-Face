@@ -116,6 +116,7 @@ _C.TEST.BATCH_SIZE_PER_GPU = 32
 
 # inference mode
 _C.TEST.INFERENCE = False
+_C.TEST.DATASET = '300W'
 _C.TEST.NUM_JOINTS = 68
 
 

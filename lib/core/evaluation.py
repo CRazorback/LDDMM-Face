@@ -15,7 +15,7 @@ import shapely.geometry as geom
 from sklearn.neighbors import NearestNeighbors
 
 from ..utils.transforms import transform_preds
-from ..utils.lddmm_params import get_curve2landmark, get_sigmaV2
+from ..utils.lddmm_params import get_curve2landmark, get_index, get_sigmaV2
 
 
 def get_preds(scores):
@@ -39,8 +39,7 @@ def get_preds(scores):
     return preds
 
 
-def compute_nme(preds, meta):
-    
+def compute_nme(preds, meta, config):
     targets = meta['pts']
     if preds.size(1) != targets.size(1):
         targets = meta['origin_pts']
@@ -51,6 +50,9 @@ def compute_nme(preds, meta):
     L = preds.shape[1]
     rmse = np.zeros(N)
 
+    if targets.shape[1] != preds.shape[1]:
+        return rmse
+
     for i in range(N):
         pts_pred, pts_gt = preds[i, ], target[i, ]
         if L == 19:  # aflw
@@ -60,15 +62,19 @@ def compute_nme(preds, meta):
         elif L == 68 or L == 72:  # 300w
             # interocular
             interocular = np.linalg.norm(pts_gt[36, ] - pts_gt[45, ])
-            # rmse[i] = np.sum(np.linalg.norm(pts_pred[0:17:2] - pts_gt[0:17:2], axis=1)) / (interocular * 9)
-        elif L == 98 or L == 96:
+        elif (L == 98 or L == 96) and meta['dataset_name'][0] == 'WFLW':
             interocular = np.linalg.norm(pts_gt[60, ] - pts_gt[72, ])
         elif L == 46 or L == 50:  # 300w weak supverised
             # interocular
             interocular = np.linalg.norm(pts_gt[22, ] - pts_gt[31, ])
-            # rmse[i] = np.sum(np.linalg.norm(pts_pred[0:9] - pts_gt[0:9], axis=1)) / (interocular * 9)
         elif L == 54:  # wflw weak supverised
             interocular = np.linalg.norm(pts_gt[34, ] - pts_gt[40, ])
+        elif L == 194: # helen
+            interocular = np.linalg.norm(pts_gt[125, ] - pts_gt[145, ])
+        elif L == 98 and meta['dataset_name'][0] == 'Helen': # helen weak supverised
+            interocular = np.linalg.norm(pts_gt[63, ] - pts_gt[73, ])
+        elif L == 78: # helen weak supverised
+            interocular = np.linalg.norm(pts_gt[50, ] - pts_gt[58, ])
         else:
             raise ValueError('Number of landmarks is wrong')
         rmse[i] = np.sum(np.linalg.norm(pts_pred - pts_gt, axis=1)) / (interocular * L)
@@ -105,7 +111,10 @@ def compute_curve_dist(preds, meta):
 
     curve2landmark_pred = get_curve2landmark(meta['dataset_name'][0], preds.shape[1])
     curve2landmark_gt = get_curve2landmark(meta['dataset_name'][0], L)
-    idx_5 = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9, 10, 11]]
+    if len(curve2landmark_gt) == 12:
+        idx_5 = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9, 10, 11]]
+    else:
+        idx_5 = [[0, 1], [9, 10], [2], [7, 8], [3, 4, 5, 6]]
 
     for i in range(N):
         pts_pred, pts_gt = preds[i, ], target[i, ]
@@ -116,13 +125,19 @@ def compute_curve_dist(preds, meta):
         elif L == 68 or L == 72:  # 300w
             # interocular
             interocular = np.linalg.norm(pts_gt[36, ] - pts_gt[45, ])
-        elif L == 98 or L == 96:
+        elif (L == 98 or L == 96) and meta['dataset_name'][0] == 'WFLW':
             interocular = np.linalg.norm(pts_gt[60, ] - pts_gt[72, ])
         elif L == 46 or L == 50:  # 300w weak supverised
             # interocular
             interocular = np.linalg.norm(pts_gt[22, ] - pts_gt[31, ])
         elif L == 54:  # wflw weak supverised
             interocular = np.linalg.norm(pts_gt[34, ] - pts_gt[40, ])
+        elif L == 194: # helen
+            interocular = np.linalg.norm(pts_gt[125, ] - pts_gt[145, ])
+        elif L == 98 and meta['dataset_name'][0] == 'Helen': # helen weak supverised
+            interocular = np.linalg.norm(pts_gt[63, ] - pts_gt[73, ])
+        elif L == 78: # helen weak supverised
+            interocular = np.linalg.norm(pts_gt[50, ] - pts_gt[58, ])
         else:
             raise ValueError('Number of landmarks is wrong')
 
@@ -151,7 +166,11 @@ def perpendicualr_dist(p1, p2, p):
 def point2curve(pts_set1, pts_set2, curve2landmark, landmark2curve):
     dist = np.zeros(pts_set1.shape[0])
     dist_5 = [[] for _ in range(5)]
-    idx_5 = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9, 10, 11]]
+    if len(curve2landmark) == 12:
+        idx_5 = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9, 10, 11]]
+    else:
+        idx_5 = [[0, 1], [9, 10], [2], [7, 8], [3, 4, 5, 6]]
+
     for idx, pt in enumerate(pts_set1):
         pt_curve = landmark2curve[idx]
         # find shortest distance to curve
@@ -188,13 +207,19 @@ def compute_perpendicular_dist(preds, meta):
         elif L == 68 or L == 72:  # 300w
             # interocular
             interocular = np.linalg.norm(pts_gt[36, ] - pts_gt[45, ])
-        elif L == 98 or L == 96:
+        elif (L == 98 or L == 96) and meta['dataset_name'][0] == 'WFLW':
             interocular = np.linalg.norm(pts_gt[60, ] - pts_gt[72, ])
         elif L == 46 or L == 50:  # 300w weak supverised
             # interocular
             interocular = np.linalg.norm(pts_gt[22, ] - pts_gt[31, ])
         elif L == 54:  # wflw weak supverised
             interocular = np.linalg.norm(pts_gt[34, ] - pts_gt[40, ])
+        elif L == 194: # helen
+            interocular = np.linalg.norm(pts_gt[125, ] - pts_gt[145, ])
+        elif L == 98 and meta['dataset_name'][0] == 'Helen': # helen weak supverised
+            interocular = np.linalg.norm(pts_gt[63, ] - pts_gt[73, ])
+        elif L == 78: # helen weak supverised
+            interocular = np.linalg.norm(pts_gt[50, ] - pts_gt[58, ])
         else:
             raise ValueError('Number of landmarks is wrong')
 
@@ -254,7 +279,12 @@ def decode_preds(output, center, scale, res):
 
 
 def decode_duplicate(preds, config):
-    if config.MODEL.NUM_JOINTS == 72:
+    if config.TEST.INFERENCE:
+        points = config.TEST.NUM_JOINTS
+    else:
+        points = config.MODEL.NUM_JOINTS
+
+    if points == 72:
         new_preds = torch.zeros([preds.size(0), 68, 2])
         new_preds[:, 0:48] = preds[:, 0:48]
         # new_preds[:, 48] = (preds[:, 48] + preds[:, 61]) / 2
@@ -270,7 +300,7 @@ def decode_duplicate(preds, config):
         new_preds[:, 64] = preds[:, 67]
         new_preds[:, 65:68] = preds[:, 68:71]
         preds = new_preds.clone()
-    elif config.MODEL.NUM_JOINTS == 50:
+    elif points == 50:
         new_preds = torch.zeros([preds.size(0), 46, 2])
         new_preds[:, 0:34] = preds[:, 0:34]
         new_preds[:, 34] = (preds[:, 34] + preds[:, 43]) / 2
@@ -292,6 +322,7 @@ class LDDMMError(nn.Module):
         self.sigmaW2 = get_sigmaV2(config.DATASET.DATASET, config.MODEL.NUM_JOINTS) / 4
         self.curve2landmark = get_curve2landmark(config.DATASET.DATASET, config.MODEL.NUM_JOINTS)
         self.curve = curve
+        self.dataset_name = config.DATASET.DATASET
 
     def curve_loss(self, pred, gt, sigmaW2):
         batch_size = pred.size(0)
@@ -322,15 +353,20 @@ class LDDMMError(nn.Module):
 
         # landmark error
         mean_error = torch.mean(torch.linalg.norm(pred_landmarks - gt_landmarks, dim=-1), dim=-1)
-        if n_pt == 68 or n_pt ==72:
+        if n_pt == 68 or n_pt == 72:
             eye_dist = gt_landmarks[:, 36] - gt_landmarks[:, 45]
         elif n_pt == 46 or n_pt == 50:
             eye_dist = gt_landmarks[:, 22] - gt_landmarks[:, 31]
-        elif n_pt == 98 or n_pt == 96:
+        elif (n_pt == 98 or n_pt == 96) and self.dataset_name == 'WFLW':
             eye_dist = gt_landmarks[:, 60] - gt_landmarks[:, 72]
         elif n_pt == 54:
             eye_dist = gt_landmarks[:, 34] - gt_landmarks[:, 40]
-
+        elif n_pt == 194:
+            eye_dist = gt_landmarks[:, 125] - gt_landmarks[:, 145]
+        elif n_pt == 98 and self.dataset_name == 'Helen': # helen weak supverised
+            eye_dist = gt_landmarks[:, 63] - gt_landmarks[:, 73]
+        elif n_pt == 78: # helen weak supverised
+            eye_dist = gt_landmarks[:, 50] - gt_landmarks[:, 58]
 
         eye_dist = torch.linalg.norm(eye_dist, dim=-1)
         landmark_error = torch.mean(mean_error / eye_dist, dim=0)
@@ -344,4 +380,5 @@ class LDDMMError(nn.Module):
             curve_error += self.curve_loss(pred_landmarks[:, v], gt_landmarks[:, v], self.sigmaW2[k])
         curve_error = torch.mean(curve_error / (n_pt * eye_dist), dim=0)
 
-        return 0.8 * landmark_error + 0.2 * curve_error
+        # return 0.8 * landmark_error + 0.2 * curve_error
+        return landmark_error + 0.1 * curve_error
