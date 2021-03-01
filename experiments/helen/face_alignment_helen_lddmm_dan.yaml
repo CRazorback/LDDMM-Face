@@ -1,27 +1,24 @@
-GPUS: (0, )
+GPUS: (0,)
 WORKERS: 8
 PRINT_FREQ: 25
 
 DATASET:
-  DATASET: 300W
+  DATASET: Helen
   ROOT: 'data/300w/images'
-  # ROOT: 'data/wflw/images'
-  TRAINSET: 'data/300w/face_landmarks_300w_train.csv'
-  # TESTSET: 'data/300w/face_landmarks_300w_valid_common.csv'
+  TRAINSET: 'data/300w/images/helen/face_landmarks_helen_train.csv'
   TESTSET: 'data/300w/images/helen/face_landmarks_helen_test.csv'
-  # TESTSET: './data/wflw/face_landmarks_wflw_test.csv'
   FLIP: true
   SCALE_FACTOR: 0.25
   ROT_FACTOR: 30
   BOUNDINGBOX_SCALE_FACTOR: 1.25
 MODEL:
-  NAME: 'lddmm_hrnet'
+  NAME: 'lddmm_dan'
   TARGET_TYPE: 'Landmark'
-  NUM_JOINTS: 68
+  NUM_JOINTS: 194
   INIT_WEIGHTS: true
-  PRETRAINED: 'hrnetv2_pretrained/HR18-300W.pth'
-  FINETUNE_FE: false
-  SIGMA: 1.0 
+  PRETRAINED: ''
+  FINETUNE_FE: true
+  SIGMA: 1.5
   IMAGE_SIZE:
     - 256
     - 256
@@ -85,5 +82,5 @@ TRAIN:
 TEST:
   BATCH_SIZE_PER_GPU: 16
   NUM_JOINTS: 194
+  INFERENCE: false
   DATASET: Helen
-  INFERENCE: true

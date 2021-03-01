@@ -324,9 +324,10 @@ class HighResolutionNet(nn.Module):
         self.is_train = not config.TEST.INFERENCE
         self.points = config.MODEL.NUM_JOINTS if self.is_train else config.TEST.NUM_JOINTS
         self.index = None
-        if (config.DATASET.DATASET == '300W' and self.points < 68) or \
-           (config.DATASET.DATASET == 'WFLW' and self.points < 98) or \
-           (config.DATASET.DATASET == 'Helen' and self.points < 194):
+        if ((config.DATASET.DATASET == '300W' and self.points < 68) or \
+            (config.DATASET.DATASET == 'WFLW' and self.points < 98) or \
+            (config.DATASET.DATASET == 'Helen' and self.points < 194)) and \
+            (config.DATASET.DATASET == config.TEST.DATASET):
             self.index = get_index(config.DATASET.DATASET, self.points)
             self.index = torch.tensor(self.index).long().cuda()
 

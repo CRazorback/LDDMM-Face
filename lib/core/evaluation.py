@@ -110,9 +110,13 @@ def compute_curve_dist(preds, meta):
     norm_dists5 = np.zeros([5, N])
 
     curve2landmark_pred = get_curve2landmark(meta['dataset_name'][0], preds.shape[1])
+    # curve2landmark_pred = get_curve2landmark('Helen', preds.shape[1])
     curve2landmark_gt = get_curve2landmark(meta['dataset_name'][0], L)
+    # temp
+    # idx_5 = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9, 10, 11]]
     if len(curve2landmark_gt) == 12:
         idx_5 = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9, 10, 11]]
+        # idx_52 = [[0, 1], [10, 11], [2, 3], [8, 9], [4, 5, 6, 7]]
     else:
         idx_5 = [[0, 1], [9, 10], [2], [7, 8], [3, 4, 5, 6]]
 
@@ -144,7 +148,8 @@ def compute_curve_dist(preds, meta):
         for j, curve_idxs in enumerate(idx_5):
             gt_landmark_idxs = []
             pred_landmark_idxs = []
-            for curve_idx in curve_idxs:
+            # curve_idxs2 = idx_52[j]
+            for k, curve_idx in enumerate(curve_idxs):
                 gt_landmark_idxs.extend(list(curve2landmark_gt[curve_idx].cpu().numpy()))
                 pred_landmark_idxs.extend(list(curve2landmark_pred[curve_idx].cpu().numpy()))
 

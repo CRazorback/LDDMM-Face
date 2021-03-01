@@ -6,6 +6,7 @@ import os
 import logging
 
 import numpy as np
+import scipy.io
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,9 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class LDDMM_Hourglass(HourglassNet):
-    def __init__(self, config):
+    def __init__(self, config, deform=True):
         super(LDDMM_Hourglass, self).__init__(config)
 
+        self.lddmm = deform
         self.is_train = not config.TEST.INFERENCE
         self.points = config.MODEL.NUM_JOINTS if self.is_train else config.TEST.NUM_JOINTS
         self.scale = config.DATASET.BOUNDINGBOX_SCALE_FACTOR
@@ -39,16 +41,31 @@ class LDDMM_Hourglass(HourglassNet):
         )
         self.regressor = nn.Linear(2048, config.MODEL.NUM_JOINTS*2)
 
+        if config.DATASET.DATASET == '300W':
+            self.init_landmarks = np.load('data/init_landmark.npy')
+            if self.points == 131:
+                self.init_landmarks = scipy.io.loadmat('data/300w/upsample_131.mat')['upsample_131']
+            self.init_landmarks -= 56
+            self.init_landmarks *= 1.25
+            self.init_landmarks += 56
+        elif config.DATASET.DATASET == 'WFLW':
+            self.init_landmarks = np.load('data/wflw/init_landmark.npy')
+        elif config.DATASET.DATASET == 'Helen':
+            self.init_landmarks = scipy.io.loadmat('data/300w/images/helen/Helen_meanShape_256_1_5x.mat')['Helen_meanShape_256_1_5x']
+            self.init_landmarks *= (112 / 256)
+        
         logger.info('=> loading initial landmarks...')
         self.init_landmarks = torch.Tensor(self.init_landmarks).cuda()
         self.init_landmarks = self.init_landmarks * config.MODEL.HEATMAP_SIZE[0] / 112
-        
+         
         if self.is_train:
             self.deform = LandmarkDeformLayer(config, n_landmark=config.MODEL.NUM_JOINTS)
         else:
             self.deform = LandmarkDeformLayer(config, n_landmark=config.TEST.NUM_JOINTS)
                     
-        if self.points != 68:
+        if (config.DATASET.DATASET == '300W' and self.points < 131) or \
+           (config.DATASET.DATASET == 'WFLW' and self.points < 98) or \
+           (config.DATASET.DATASET == 'Helen' and self.points < 194):
             self.index = get_index(config.DATASET.DATASET, self.points)
             self.init_landmarks = self.init_landmarks[self.index]
 
@@ -97,7 +114,10 @@ class LDDMM_Hourglass(HourglassNet):
                                 [2:]).view(y.size(0), -1)
 
         alpha = self.regressor(y)
-        deformed_pts = self.deform(alpha, init_pts)
+        if self.lddmm:
+            deformed_pts = self.deform(alpha, init_pts)
+        else:
+            deformed_pts = alpha.view(alpha.size(0), -1, 2)
 
         return deformed_pts
 

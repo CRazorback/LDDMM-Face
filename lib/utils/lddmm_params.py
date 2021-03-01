@@ -114,18 +114,32 @@ def get_curve2landmark(dataset_name, num_pts):
             }
     elif dataset_name == 'Helen':
         if num_pts == 194:
+            # curve2landmark = {
+            #     0: torch.arange(0, 21).long().cuda(),
+            #     1: torch.arange(21, 41).long().cuda(),
+            #     2: torch.arange(41, 58).long().cuda(),
+            #     3: torch.arange(58, 72).long().cuda(),
+            #     4: torch.arange(72, 86).long().cuda(),
+            #     5: torch.arange(86, 100).long().cuda(),
+            #     6: torch.arange(100, 114).long().cuda(),
+            #     7: torch.arange(114, 134).long().cuda(),
+            #     8: torch.arange(134, 154).long().cuda(),
+            #     9: torch.arange(154, 174).long().cuda(),
+            #     10: torch.arange(174, 194).long().cuda()
+            # }
             curve2landmark = {
                 0: torch.arange(0, 21).long().cuda(),
                 1: torch.arange(21, 41).long().cuda(),
-                2: torch.arange(41, 58).long().cuda(),
-                3: torch.arange(58, 72).long().cuda(),
-                4: torch.arange(72, 86).long().cuda(),
-                5: torch.arange(86, 100).long().cuda(),
-                6: torch.arange(100, 114).long().cuda(),
-                7: torch.arange(114, 134).long().cuda(),
-                8: torch.arange(134, 154).long().cuda(),
-                9: torch.arange(154, 174).long().cuda(),
-                10: torch.arange(174, 194).long().cuda()
+                2: torch.cat([torch.arange(41, 45), torch.arange(54, 58)]).long().cuda(),
+                3: torch.arange(45, 54).long().cuda(),
+                4: torch.arange(58, 72).long().cuda(),
+                5: torch.arange(72, 86).long().cuda(),
+                6: torch.arange(86, 100).long().cuda(),
+                7: torch.arange(100, 114).long().cuda(),
+                8: torch.arange(114, 134).long().cuda(),
+                9: torch.arange(134, 154).long().cuda(),
+                10: torch.arange(154, 174).long().cuda(),
+                11: torch.arange(174, 194).long().cuda()
             }
         elif num_pts == 98:
             curve2landmark = {

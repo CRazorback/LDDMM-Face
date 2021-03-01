@@ -218,7 +218,8 @@ def inference(config, data_loader, model):
             # NME
             nme_temp = compute_nme(preds, meta, config)
             curve_dist_temp, curve_dist5_temp = compute_curve_dist(preds, meta)
-            pcurve_dist_temp, pcurve_dist5_temp = compute_perpendicular_dist(preds, meta)
+            # pcurve_dist_temp, pcurve_dist5_temp = compute_perpendicular_dist(preds, meta)
+            pcurve_dist_temp, pcurve_dist5_temp = compute_curve_dist(preds, meta)
 
             failure_008 = (nme_temp > 0.08).sum()
             failure_010 = (nme_temp > 0.10).sum()

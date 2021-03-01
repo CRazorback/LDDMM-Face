@@ -65,7 +65,7 @@ def main():
     # loss
     if 'lddmm' in config.MODEL['NAME']:
         criterion = LDDMMError(config).cuda()
-    elif 'coord' in config.MODEL['NAME']:
+    elif 'coord' in config.MODEL['NAME'] or 'dan' in config.MODEL['NAME']:
         criterion = LDDMMError(config, curve=False).cuda()
     else:
         criterion = nn.MSELoss()

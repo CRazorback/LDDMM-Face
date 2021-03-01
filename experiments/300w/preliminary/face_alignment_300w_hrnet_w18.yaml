@@ -4,9 +4,12 @@ PRINT_FREQ: 50
 
 DATASET:
   DATASET: 300W
-  ROOT: 'data/300w/images'
+  # ROOT: 'data/300w/images'
+  ROOT: 'data/wflw/images'
   TRAINSET: 'data/300w/face_landmarks_300w_train.csv'
-  TESTSET: 'data/300w/face_landmarks_300w_valid_common.csv'
+  # TESTSET: 'data/300w/face_landmarks_300w_valid_common.csv'
+  TESTSET: './data/wflw/face_landmarks_wflw_test.csv'
+  # TESTSET: 'data/300w/images/helen/face_landmarks_helen_test.csv'
   FLIP: true
   SCALE_FACTOR: 0.25
   ROT_FACTOR: 30
@@ -79,4 +82,5 @@ TRAIN:
 TEST:
   BATCH_SIZE_PER_GPU: 8
   INFERENCE: true
-  NUM_JOINTS: 46
+  NUM_JOINTS: 96
+  DATASET: WFLW

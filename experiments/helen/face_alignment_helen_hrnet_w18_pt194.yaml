@@ -6,7 +6,8 @@ DATASET:
   DATASET: Helen
   ROOT: 'data/300w/images'
   TRAINSET: 'data/300w/images/helen/face_landmarks_helen_train.csv'
-  TESTSET: 'data/300w/images/helen/face_landmarks_helen_test.csv'
+  # TESTSET: 'data/300w/images/helen/face_landmarks_helen_test.csv'
+  TESTSET: 'data/300w/face_landmarks_300w_valid_common.csv'
   FLIP: true
   SCALE_FACTOR: 0.25
   ROT_FACTOR: 30
@@ -78,6 +79,6 @@ TRAIN:
   NESTEROV: false
 TEST:
   BATCH_SIZE_PER_GPU: 8
-  NUM_JOINTS: 78
+  NUM_JOINTS: 68
   INFERENCE: true
-  DATASET: Helen
+  DATASET: 300W

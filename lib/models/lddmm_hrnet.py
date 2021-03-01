@@ -243,23 +243,23 @@ class LDDMMHighResolutionNet(HighResolutionNet):
         output = self.forward_function(x, init_pts)
 
         # debug
-        import random
-        import imageio
-        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        filename = './debug/{}_{}.jpg'
-        index = random.randint(0, 100)
-        origin_img = x[1].detach().cpu().permute(1, 2, 0).numpy()
-        origin_img = origin_img * std + mean
-        # landmark image
-        landmark_imgs = self.landmark2img(x, output)
-        # landmark40 = self.landmark2img(x[0].unsqueeze(0), self.deform.train_init_landmark.unsqueeze(0) * 256 / 112)
-        landmark_img = landmark_imgs[1, 0].detach().cpu().numpy()
-        # landmark40 = landmark40[0, 0].detach().cpu().numpy()
-        overlap = np.where(landmark_img == 0, origin_img[..., 0], landmark_img)
-        imageio.imwrite(filename.format('origin', index), (origin_img*255).astype(np.uint8))
-        imageio.imwrite(filename.format('overlap', index), (overlap*255).astype(np.uint8))
-        # imageio.imwrite(filename.format('init_landmark', index), (landmark40*255).astype(np.uint8))
+        # import random
+        # import imageio
+        # mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        # std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        # filename = './debug/{}_{}.jpg'
+        # index = random.randint(0, 100)
+        # origin_img = x[1].detach().cpu().permute(1, 2, 0).numpy()
+        # origin_img = origin_img * std + mean
+        # # landmark image
+        # landmark_imgs = self.landmark2img(x, output)
+        # # landmark40 = self.landmark2img(x[0].unsqueeze(0), self.deform.train_init_landmark.unsqueeze(0) * 256 / 112)
+        # landmark_img = landmark_imgs[1, 0].detach().cpu().numpy()
+        # # landmark40 = landmark40[0, 0].detach().cpu().numpy()
+        # overlap = np.where(landmark_img == 0, origin_img[..., 0], landmark_img)
+        # imageio.imwrite(filename.format('origin', index), (origin_img*255).astype(np.uint8))
+        # imageio.imwrite(filename.format('overlap', index), (overlap*255).astype(np.uint8))
+        # # imageio.imwrite(filename.format('init_landmark', index), (landmark40*255).astype(np.uint8))
 
         return output
 
@@ -277,14 +277,30 @@ class LDDMMHighResolutionNet(HighResolutionNet):
             target_init_landmarks -= 56
             target_init_landmarks *= 1.25
             target_init_landmarks += 56
-            s2t = [0, 1, -1, -1, -1, -1, 8, 7, 3, 4, 5, 6]
+            # s2t = [0, 1, 10, 9, -1, -1, 8, 7, 3, 4, 5, 6]
+            s2t = [0, 1, 11, 10, 2, 3, 9, 8, 4, 5, 6, 7]
         elif config.DATASET.DATASET == 'Helen' and config.TEST.DATASET == '300W':
             source_init_landmarks = scipy.io.loadmat('data/300w/images/helen/Helen_meanShape_256_1_5x.mat')['Helen_meanShape_256_1_5x']
             source_init_landmarks *= (112 / 256)
             target_init_landmarks = scipy.io.loadmat('data/300w/images/helen/300w_to_Helen_baseShape.mat')['shape']
             target_init_landmarks *= (112 / 256)
-            s2t = [0, 1, -1, 8, 9, 10, 11, 7, 6, -1, -1]
-            # s2t = [0, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+            # s2t = [0, 1, -1, 8, 9, 10, 11, 7, 6, 3, 2]
+            s2t = [0, 1, [4, 5], 8, 9, 10, 11, 7, 6, 3, 2]
+        elif config.DATASET.DATASET == '300W' and config.TEST.DATASET == 'WFLW':
+            source_init_landmarks = np.load('data/init_landmark.npy')
+            source_init_landmarks -= 56
+            source_init_landmarks *= 1.25
+            source_init_landmarks += 56
+            target_init_landmarks = scipy.io.loadmat('data/300w/WFLW_to_300w_finalShape_withoutEyeCenter.mat')['shape_final']
+            target_init_landmarks -= 56
+            target_init_landmarks *= 1.25
+            target_init_landmarks += 56
+            s2t = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        elif config.DATASET.DATASET == 'WFLW' and config.TEST.DATASET == '300W':
+            source_init_landmarks = np.load('data/wflw/init_landmark.npy')
+            target_init_landmarks = scipy.io.loadmat('data/wflw/300w_to_WFLW_finalShape.mat')['shape_final']
+            s2t = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+
         
         source_curve2landmark = get_curve2landmark(config.DATASET.DATASET, config.MODEL.NUM_JOINTS)
         target_curve2landmark = get_curve2landmark(config.TEST.DATASET, config.TEST.NUM_JOINTS)
@@ -298,7 +314,11 @@ class LDDMMHighResolutionNet(HighResolutionNet):
         results = torch.ones([batch_size, config.TEST.NUM_JOINTS, 2]).cuda()
 
         for k, v in source_curve2landmark.items():
-            if s2t[k] != -1:
+            if isinstance(s2t[k], list):
+                for i in s2t[k]:
+                    target_curve = target_curve2landmark[i]
+                    results[:, target_curve] = curve_deform(momentum[:, v], source_init_landmarks[:, v], target_init_landmarks[:, target_curve], sigmaV2[v][0])
+            elif s2t[k] != -1:
                 target_curve = target_curve2landmark[s2t[k]]
                 results[:, target_curve] = curve_deform(momentum[:, v], source_init_landmarks[:, v], target_init_landmarks[:, target_curve], sigmaV2[v][0])
 
