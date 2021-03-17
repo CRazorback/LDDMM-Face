@@ -1,4 +1,4 @@
-# LDDMM-Face: 
+# LDDMM-Face: Large Deformation Diffeomorphic Metric Learning for Flexible and Consistent Face Alignment
 
 ## Quick start
 ### Environment
