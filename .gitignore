@@ -128,6 +128,7 @@ dmypy.json
 .pyre/
 
 # custom
+.vscode/
 data/
 log/
 output/
