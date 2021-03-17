@@ -6,7 +6,7 @@ DATASET:
   DATASET: WFLW
   ROOT: './data/wflw/images/'
   TRAINSET: './data/wflw/face_landmarks_wflw_train.csv'
-  TESTSET: './data/wflw/face_landmarks_wflw_test.csv'
+  TESTSET: './data/wflw/face_landmarks_wflw_test_largepose.csv'
   FLIP: true
   SCALE_FACTOR: 0.25
   ROT_FACTOR: 30
@@ -82,3 +82,5 @@ TEST:
   BATCH_SIZE_PER_GPU: 16
   INFERENCE: true
   NUM_JOINTS: 96
+  DATASET: WFLW
+  SAVE_FIG: true

@@ -1,22 +1,22 @@
 GPUS: (0, )
-WORKERS: 4
+WORKERS: 8
 PRINT_FREQ: 25
 
 DATASET:
-  DATASET: 300W
+  DATASET: Helen
   ROOT: 'data/300w/images'
-  TRAINSET: 'data/300w/face_landmarks_300w_train.csv'
-  TESTSET: 'data/300w/face_landmarks_300w_valid.csv'
+  TRAINSET: 'data/300w/images/helen/face_landmarks_helen_train.csv'
+  TESTSET: 'data/300w/images/helen/face_landmarks_helen_test.csv'
   FLIP: true
   SCALE_FACTOR: 0.25
   ROT_FACTOR: 30
   BOUNDINGBOX_SCALE_FACTOR: 1.25
 MODEL:
-  NAME: 'coord_hrnet'
+  NAME: 'coord_hourglass'
   TARGET_TYPE: 'Landmark'
-  NUM_JOINTS: 68
+  NUM_JOINTS: 194
   INIT_WEIGHTS: true
-  PRETRAINED: 'hrnetv2_pretrained/hrnetv2_w18_imagenet_pretrained.pth'
+  PRETRAINED: ''
   FINETUNE_FE: true
   SIGMA: 1.0 
   IMAGE_SIZE:
@@ -81,3 +81,6 @@ TRAIN:
   NESTEROV: false
 TEST:
   BATCH_SIZE_PER_GPU: 16
+  NUM_JOINTS: 194
+  DATASET: Helen
+  INFERENCE: false

@@ -12,19 +12,19 @@ DATASET:
   ROT_FACTOR: 30
   BOUNDINGBOX_SCALE_FACTOR: 1.25
 MODEL:
-  NAME: 'coord_hrnet'
+  NAME: 'lddmm_hourglass'
   TARGET_TYPE: 'Landmark'
   NUM_JOINTS: 68
   INIT_WEIGHTS: true
-  PRETRAINED: 'hrnetv2_pretrained/hrnetv2_w18_imagenet_pretrained.pth'
+  PRETRAINED: ''
   FINETUNE_FE: true
   SIGMA: 1.0 
   IMAGE_SIZE:
     - 256
     - 256
   HEATMAP_SIZE:
-    - 112
-    - 112
+    - 256
+    - 256
   EXTRA:
     FINAL_CONV_KERNEL: 1
     STAGE2:
@@ -81,3 +81,6 @@ TRAIN:
   NESTEROV: false
 TEST:
   BATCH_SIZE_PER_GPU: 16
+  DATASET: 300W
+  NUM_JOINTS: 68
+  INFERENCE: false

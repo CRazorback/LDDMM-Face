@@ -15,8 +15,8 @@ MODEL:
   TARGET_TYPE: 'Landmark'
   NUM_JOINTS: 96
   INIT_WEIGHTS: true
-  PRETRAINED: 'output/WFLW/face_alignment_wflw_hourglass_w18/model_best.pth'
-  FINETUNE_FE: false
+  PRETRAINED: ''
+  FINETUNE_FE: true
   SIGMA: 1.5
   IMAGE_SIZE:
     - 256

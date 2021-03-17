@@ -13,6 +13,7 @@ import numpy as np
 import shapely.geometry as geom
 
 from sklearn.neighbors import NearestNeighbors
+from scipy.integrate import simps
 
 from ..utils.transforms import transform_preds
 from ..utils.lddmm_params import get_curve2landmark, get_index, get_sigmaV2
@@ -59,6 +60,8 @@ def compute_nme(preds, meta, config):
             interocular = meta['box_size'][i]
         elif L == 29:  # cofw
             interocular = np.linalg.norm(pts_gt[8, ] - pts_gt[9, ])
+        # elif L == 68 and meta['dataset_name'][0] == 'COFW':
+        #     interocular = meta['box_size'][i]
         elif L == 68 or L == 72:  # 300w
             # interocular
             interocular = np.linalg.norm(pts_gt[36, ] - pts_gt[45, ])
@@ -77,6 +80,8 @@ def compute_nme(preds, meta, config):
             interocular = np.linalg.norm(pts_gt[50, ] - pts_gt[58, ])
         else:
             raise ValueError('Number of landmarks is wrong')
+        # pts_pred = np.concatenate((pts_pred[0:27], pts_pred[31:]), axis=0)
+        # pts_gt = np.concatenate((pts_gt[0:27], pts_gt[31:]), axis=0)
         rmse[i] = np.sum(np.linalg.norm(pts_pred - pts_gt, axis=1)) / (interocular * L)
 
     return rmse
@@ -100,6 +105,67 @@ def nearest_neighbor(src, dst):
 
 
 def compute_curve_dist(preds, meta):
+    targets = meta['pts']
+    preds = preds.numpy()
+    target = targets.cpu().numpy()
+
+    N = preds.shape[0]
+    L = targets.shape[1]
+    norm_dists = np.zeros(N)
+    norm_dists5 = np.zeros([5, N])
+
+    curve2landmark_pred = get_curve2landmark(meta['dataset_name'][0], preds.shape[1])
+    curve2landmark_gt = get_curve2landmark(meta['dataset_name'][0], L)
+    if len(curve2landmark_gt) == 12:
+        idx_5 = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9, 10, 11]]
+        # idx_5 = [[0, 1], [10, 11], [2, 3], [8, 9], [4, 5, 6, 7]]
+    else:
+        idx_5 = [[0, 1], [9, 10], [2], [7, 8], [3, 4, 5, 6]]
+
+    for i in range(N):
+        pts_pred, pts_gt = preds[i, ], target[i, ]
+        if L == 19:  # aflw
+            interocular = meta['box_size'][i]
+        elif L == 29:  # cofw
+            interocular = np.linalg.norm(pts_gt[8, ] - pts_gt[9, ])
+        elif L == 68 or L == 72:  # 300w
+            # interocular
+            interocular = np.linalg.norm(pts_gt[36, ] - pts_gt[45, ])
+        elif (L == 98 or L == 96) and meta['dataset_name'][0] == 'WFLW':
+            interocular = np.linalg.norm(pts_gt[60, ] - pts_gt[72, ])
+        elif L == 46 or L == 50:  # 300w weak supverised
+            # interocular
+            interocular = np.linalg.norm(pts_gt[22, ] - pts_gt[31, ])
+        elif L == 54:  # wflw weak supverised
+            interocular = np.linalg.norm(pts_gt[34, ] - pts_gt[40, ])
+        elif L == 194: # helen
+            interocular = np.linalg.norm(pts_gt[125, ] - pts_gt[145, ])
+        elif L == 98 and meta['dataset_name'][0] == 'Helen': # helen weak supverised
+            interocular = np.linalg.norm(pts_gt[63, ] - pts_gt[73, ])
+        elif L == 78: # helen weak supverised
+            interocular = np.linalg.norm(pts_gt[50, ] - pts_gt[58, ])
+        else:
+            raise ValueError('Number of landmarks is wrong')
+
+        for j, curve_idxs in enumerate(idx_5):
+            gt_landmark_idxs = []
+            pred_landmark_idxs = []
+            for k, curve_idx in enumerate(curve_idxs):
+                gt_landmark_idxs.extend(list(curve2landmark_gt[curve_idx].cpu().numpy()))
+                pred_landmark_idxs.extend(list(curve2landmark_pred[curve_idx].cpu().numpy()))
+
+            sub_pts_gt = pts_gt[gt_landmark_idxs]
+            sub_pts_pred = pts_pred[pred_landmark_idxs]
+            dist, _ = nearest_neighbor(sub_pts_pred, sub_pts_gt)
+            dist_inv, _ = nearest_neighbor(sub_pts_gt, sub_pts_pred)
+            norm_dists5[j, i] = np.mean(np.concatenate([dist, dist_inv])) / interocular
+
+        norm_dists[i] = np.mean(norm_dists5[:, i])
+
+    return norm_dists, norm_dists5
+
+
+def compute_cross_dataset_curve_dist(preds, meta):
     targets = meta['origin_pts']
     preds = preds.numpy()
     target = targets.cpu().numpy()
@@ -110,7 +176,6 @@ def compute_curve_dist(preds, meta):
     norm_dists5 = np.zeros([5, N])
 
     curve2landmark_pred = get_curve2landmark(meta['dataset_name'][0], preds.shape[1])
-    # curve2landmark_pred = get_curve2landmark('Helen', preds.shape[1])
     curve2landmark_gt = get_curve2landmark(meta['dataset_name'][0], L)
     # temp
     # idx_5 = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9, 10, 11]]
@@ -252,6 +317,19 @@ def compute_perpendicular_dist(preds, meta):
     return norm_dists, norm_dists5
 
 
+def AUCError(errors, failureThreshold, logger, step=0.0001, showCurve=False):
+    nErrors = len(errors)
+    xAxis = list(np.arange(0., failureThreshold + step, step))
+
+    ced =  [float(np.count_nonzero([errors <= x])) / nErrors for x in xAxis]
+
+    AUC = simps(ced, x=xAxis) / failureThreshold
+    failureRate = 1. - ced[-1]
+
+    logger.info("AUC @ {0}: {1}".format(failureThreshold, AUC))
+    logger.info("Failure rate: {0}".format(failureRate))
+
+
 def decode_preds(output, center, scale, res):
     if len(output.size()) == 4:
         coords = get_preds(output)  # float type
@@ -324,6 +402,7 @@ def decode_duplicate(preds, config):
 class LDDMMError(nn.Module):
     def __init__(self, config, curve=True):
         super(LDDMMError, self).__init__()
+        self.beta = config.TRAIN.BETA
         self.sigmaW2 = get_sigmaV2(config.DATASET.DATASET, config.MODEL.NUM_JOINTS) / 4
         self.curve2landmark = get_curve2landmark(config.DATASET.DATASET, config.MODEL.NUM_JOINTS)
         self.curve = curve
@@ -386,4 +465,4 @@ class LDDMMError(nn.Module):
         curve_error = torch.mean(curve_error / (n_pt * eye_dist), dim=0)
 
         # return 0.8 * landmark_error + 0.2 * curve_error
-        return landmark_error + 0.1 * curve_error
+        return landmark_error + self.beta * curve_error

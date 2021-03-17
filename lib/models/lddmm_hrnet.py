@@ -34,7 +34,7 @@ class LDDMMHighResolutionNet(HighResolutionNet):
 
         self.config = config
         # self.return_momentum = False
-        self.return_momentum = (config.TEST.DATASET != config.DATASET.DATASET)
+        self.return_momentum = (config.TEST.DATASET != config.DATASET.DATASET) and (config.TEST.DATASET != 'COFW')
         self.is_train = not config.TEST.INFERENCE
         self.lddmm = deform
         self.points = config.MODEL.NUM_JOINTS if self.is_train else config.TEST.NUM_JOINTS
@@ -91,7 +91,7 @@ class LDDMMHighResolutionNet(HighResolutionNet):
 
         self.regressor = nn.Linear(2048, config.MODEL.NUM_JOINTS*2)
         
-        if config.DATASET.DATASET == '300W':
+        if config.DATASET.DATASET == '300W' or config.DATASET.DATASET == 'COFW':
             self.init_landmarks = np.load('data/init_landmark.npy')
             if self.points == 131:
                 self.init_landmarks = scipy.io.loadmat('data/300w/upsample_131.mat')['upsample_131']
@@ -118,7 +118,7 @@ class LDDMMHighResolutionNet(HighResolutionNet):
         if ((config.DATASET.DATASET == '300W' and self.points < 131) or \
            (config.DATASET.DATASET == 'WFLW' and self.points < 98) or \
            (config.DATASET.DATASET == 'Helen' and self.points < 194)) and \
-            not self.return_momentum:
+            not self.return_momentum and (config.TEST.DATASET != 'COFW'):
             self.index = get_index(config.DATASET.DATASET, self.points)
             self.init_landmarks = self.init_landmarks[self.index]
 
@@ -247,14 +247,14 @@ class LDDMMHighResolutionNet(HighResolutionNet):
         # import imageio
         # mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         # std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        # filename = './debug/{}_{}.jpg'
+        # filename = './debug2/{}_{}.jpg'
         # index = random.randint(0, 100)
-        # origin_img = x[1].detach().cpu().permute(1, 2, 0).numpy()
+        # origin_img = x[0].detach().cpu().permute(1, 2, 0).numpy()
         # origin_img = origin_img * std + mean
         # # landmark image
         # landmark_imgs = self.landmark2img(x, output)
         # # landmark40 = self.landmark2img(x[0].unsqueeze(0), self.deform.train_init_landmark.unsqueeze(0) * 256 / 112)
-        # landmark_img = landmark_imgs[1, 0].detach().cpu().numpy()
+        # landmark_img = landmark_imgs[0, 0].detach().cpu().numpy()
         # # landmark40 = landmark40[0, 0].detach().cpu().numpy()
         # overlap = np.where(landmark_img == 0, origin_img[..., 0], landmark_img)
         # imageio.imwrite(filename.format('origin', index), (origin_img*255).astype(np.uint8))
@@ -273,7 +273,9 @@ class LDDMMHighResolutionNet(HighResolutionNet):
             source_init_landmarks -= 56
             source_init_landmarks *= 1.25
             source_init_landmarks += 56
-            target_init_landmarks = scipy.io.loadmat('data/300w/Helen_to_300w_baseShape.mat')['shape']
+            target_init_landmarks1 = scipy.io.loadmat('data/300w/Helen_to_300w_baseShape.mat')['shape']
+            target_init_landmarks2 = scipy.io.loadmat('data/300w/Helen_to_300w_finalShape_fineTuned.mat')['data_Helen']
+            target_init_landmarks = np.concatenate((target_init_landmarks2[0:41], target_init_landmarks1[41:58], target_init_landmarks2[58:]), axis=0)
             target_init_landmarks -= 56
             target_init_landmarks *= 1.25
             target_init_landmarks += 56
@@ -282,7 +284,9 @@ class LDDMMHighResolutionNet(HighResolutionNet):
         elif config.DATASET.DATASET == 'Helen' and config.TEST.DATASET == '300W':
             source_init_landmarks = scipy.io.loadmat('data/300w/images/helen/Helen_meanShape_256_1_5x.mat')['Helen_meanShape_256_1_5x']
             source_init_landmarks *= (112 / 256)
-            target_init_landmarks = scipy.io.loadmat('data/300w/images/helen/300w_to_Helen_baseShape.mat')['shape']
+            target_init_landmarks1 = scipy.io.loadmat('data/300w/images/helen/300w_to_Helen_baseShape.mat')['shape']
+            target_init_landmarks2 = scipy.io.loadmat('data/300w/images/helen/300w_to_Helen_finalShape_fineTuned.mat')['data_300w']
+            target_init_landmarks = np.concatenate((target_init_landmarks1[0:36], target_init_landmarks2[36:]), axis=0)
             target_init_landmarks *= (112 / 256)
             # s2t = [0, 1, -1, 8, 9, 10, 11, 7, 6, 3, 2]
             s2t = [0, 1, [4, 5], 8, 9, 10, 11, 7, 6, 3, 2]
@@ -291,14 +295,17 @@ class LDDMMHighResolutionNet(HighResolutionNet):
             source_init_landmarks -= 56
             source_init_landmarks *= 1.25
             source_init_landmarks += 56
-            target_init_landmarks = scipy.io.loadmat('data/300w/WFLW_to_300w_finalShape_withoutEyeCenter.mat')['shape_final']
+            target_init_landmarks = scipy.io.loadmat('data/300w/WFLW_to_300w_finalShape_fineTuned.mat')['data_WFLW']
+            target_init_landmarks1 = np.concatenate((target_init_landmarks[0:68], target_init_landmarks[69:77], target_init_landmarks[78:]), axis=0)
+            target_init_landmarks2 = scipy.io.loadmat('data/300w/WFLW_to_300w_finalShape_withoutEyeCenter.mat')['shape_final']
+            target_init_landmarks = np.concatenate((target_init_landmarks2[0:60], target_init_landmarks1[60:76], target_init_landmarks2[76:]), axis=0)
             target_init_landmarks -= 56
             target_init_landmarks *= 1.25
             target_init_landmarks += 56
             s2t = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
         elif config.DATASET.DATASET == 'WFLW' and config.TEST.DATASET == '300W':
             source_init_landmarks = np.load('data/wflw/init_landmark.npy')
-            target_init_landmarks = scipy.io.loadmat('data/wflw/300w_to_WFLW_finalShape.mat')['shape_final']
+            target_init_landmarks = scipy.io.loadmat('data/wflw/300w_to_WFLW_finalShape_fineTuned.mat')['data_300w']
             s2t = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
         

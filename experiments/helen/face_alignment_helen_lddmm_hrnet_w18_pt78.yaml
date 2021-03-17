@@ -84,3 +84,4 @@ TEST:
   NUM_JOINTS: 194
   INFERENCE: true
   DATASET: Helen
+  SAVE_FIG: true

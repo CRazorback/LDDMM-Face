@@ -6,10 +6,12 @@ DATASET:
   DATASET: 300W
   ROOT: 'data/300w/images'
   # ROOT: 'data/wflw/images'
+  # ROOT: './data'
   TRAINSET: 'data/300w/face_landmarks_300w_train.csv'
-  # TESTSET: 'data/300w/face_landmarks_300w_valid_common.csv'
-  TESTSET: 'data/300w/images/helen/face_landmarks_helen_test.csv'
+  TESTSET: 'data/300w/face_landmarks_300w_valid.csv'
+  # TESTSET: 'data/300w/images/helen/face_landmarks_helen_test.csv'
   # TESTSET: './data/wflw/face_landmarks_wflw_test.csv'
+  # TESTSET: './data/cofw/COFW_test_color.mat'
   FLIP: true
   SCALE_FACTOR: 0.25
   ROT_FACTOR: 30
@@ -84,6 +86,7 @@ TRAIN:
   NESTEROV: false
 TEST:
   BATCH_SIZE_PER_GPU: 16
-  NUM_JOINTS: 194
-  DATASET: Helen
+  NUM_JOINTS: 68
+  DATASET: 300W
   INFERENCE: true
+  SAVE_FIG: true

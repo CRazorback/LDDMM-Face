@@ -10,8 +10,8 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["--cfg", "experiments/wflw/face_alignment_wflw_lddmm_hrnet_w18.yaml",
-                     "--model-file", "output/WFLW/face_alignment_wflw_lddmm_hrnet_w18/model_best.pth"]
+            "args": ["--cfg", "experiments/300w/hrnet_lddmm/face_alignment_300w_lddmm_hrnet_w18_pt68_cl01.yaml",
+                     "--model-file", "output/300W/face_alignment_300w_lddmm_hrnet_w18_pt68_cl01/model_best.pth"]
         }
     ]
 }

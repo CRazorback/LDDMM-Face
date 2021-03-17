@@ -85,3 +85,4 @@ TEST:
   NUM_JOINTS: 68
   DATASET: 300W
   INFERENCE: true
+  SAVE_FIG: false

@@ -90,6 +90,19 @@ class WFLW(data.Dataset):
                     target[i] = generate_target(target[i], tpts[i]-1, self.sigma,
                                                 label_type=self.label_type)
 
+        # import imageio
+        # import cv2
+        # img1, img2 = img.copy(), img.copy()
+        # tpts = tpts.astype(np.uint8)
+        # for k in range(tpts.shape[0]):
+        #     cv2.circle(img1, (tpts[k, 0], tpts[k, 1]), 3, [0, 255, 0], -1)
+        # imageio.imwrite('Figure1-WFLW/full{}.jpg'.format(idx), img1)
+        # tpts_ = tpts[self.index]
+        # for k in range(tpts_.shape[0]):
+        #     cv2.circle(img2, (tpts_[k, 0], tpts_[k, 1]), 3, [0, 255, 0], -1)
+        # imageio.imwrite('Figure1-WFLW/weak{}.jpg'.format(idx), img2)
+        # print(idx)
+
         img = img.astype(np.float32)
         img = (img / 255.0 - self.mean) / self.std
         img = img.transpose([2, 0, 1])

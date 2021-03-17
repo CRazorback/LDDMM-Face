@@ -90,6 +90,8 @@ _C.DATASET.ROT_FACTOR = 30
 # train
 _C.TRAIN = CN()
 
+_C.TRAIN.BETA = 0.1 # LDDMM curve loss
+
 _C.TRAIN.LR_FACTOR = 0.1
 _C.TRAIN.LR_STEP = [30, 50]
 _C.TRAIN.LR = 0.0001
@@ -118,6 +120,7 @@ _C.TEST.BATCH_SIZE_PER_GPU = 32
 _C.TEST.INFERENCE = False
 _C.TEST.DATASET = '300W'
 _C.TEST.NUM_JOINTS = 68
+_C.TEST.SAVE_FIG = False
 
 
 def update_config(cfg, args):

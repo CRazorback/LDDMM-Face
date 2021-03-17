@@ -13,10 +13,10 @@ DATASET:
 MODEL:
   NAME: 'coord_hrnet'
   TARGET_TYPE: 'Landmark'
-  NUM_JOINTS: 96
+  NUM_JOINTS: 98
   INIT_WEIGHTS: true
   PRETRAINED: 'hrnetv2_pretrained/hrnetv2_w18_imagenet_pretrained.pth'
-  FINETUNE_FE: false
+  FINETUNE_FE: true
   SIGMA: 1.5
   IMAGE_SIZE:
     - 256
@@ -80,6 +80,6 @@ TRAIN:
   NESTEROV: false
 TEST:
   BATCH_SIZE_PER_GPU: 16
-  NUM_JOINTS: 96
+  NUM_JOINTS: 98
   DATASET: WFLW
   INFERENCE: false

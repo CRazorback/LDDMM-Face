@@ -6,7 +6,7 @@ DATASET:
   DATASET: 300W
   ROOT: 'data/300w/images'
   TRAINSET: 'data/300w/face_landmarks_300w_train.csv'
-  TESTSET: 'data/300w/face_landmarks_300w_valid_common.csv'
+  TESTSET: 'data/300w/face_landmarks_300w_valid.csv'
   FLIP: true
   SCALE_FACTOR: 0.25
   ROT_FACTOR: 30
@@ -16,7 +16,7 @@ MODEL:
   TARGET_TYPE: 'Landmark'
   NUM_JOINTS: 50
   INIT_WEIGHTS: true
-  PRETRAINED: 'hrnetv2_pretrained/HR18-300W.pth'
+  PRETRAINED: ''
   FINETUNE_FE: false
   SIGMA: 1.0 
   IMAGE_SIZE:
@@ -83,3 +83,5 @@ TEST:
   BATCH_SIZE_PER_GPU: 16
   NUM_JOINTS: 72
   INFERENCE: true
+  DATASET: 300W
+  SAVE_FIG: true
