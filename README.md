@@ -1,6 +1,6 @@
 # LDDMM-Face: Large deformation diffeomorphic metric learning for cross-annotation face alignment
 
-By Huilin Yang†, Junyan Lyu†, Pujin Cheng, Xiaoying Tang.
+By Huilin Yang†, Junyan Lyu†, Pujin Cheng, Roger Tam, Xiaoying Tang.
 
 This repository contains an official implementation of LDDMM-Face for the **Pattern Recognition** paper ["LDDMM-Face: Large deformation diffeomorphic metric learning for cross-annotation face alignment"](https://doi.org/10.1016/j.patcog.2024.110569).
 
