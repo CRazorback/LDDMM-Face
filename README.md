@@ -25,3 +25,20 @@ python tools/train.py --cfg <CONFIG-FILE>
 ```shell
 python tools/test.py --cfg <CONFIG-FILE> --model-file <MODEL-FILE>
 ```
+
+## Citation
+If you find this repository useful, please consider citing LDDMM-Face paper:
+
+```
+@article{YANG2024110569,
+title = {LDDMM-Face: Large deformation diffeomorphic metric learning for cross-annotation face alignment},
+journal = {Pattern Recognition},
+pages = {110569},
+year = {2024},
+issn = {0031-3203},
+doi = {https://doi.org/10.1016/j.patcog.2024.110569},
+url = {https://www.sciencedirect.com/science/article/pii/S0031320324003200},
+author = {Huilin Yang and Junyan Lyu and Pujin Cheng and Roger Tam and Xiaoying Tang},
+keywords = {Face alignment, Facial landmarks, Diffeomorphic mapping, Deep learning}
+}
+```
